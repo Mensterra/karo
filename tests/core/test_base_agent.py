@@ -254,10 +254,10 @@ def test_base_agent_run_with_tool_call_success(base_agent, mock_provider, mock_p
     mock_prompt_builder.build.assert_called_with(tools=base_agent.llm_tools, memories=[]) # Assuming no memories retrieved here
 
     # Check second provider call arguments
-    second_call_args = mock_provider.generate_response.call_args_list[1]
-    assert second_call_args.kwargs['tool_choice'] == "none"
+    second_call_args = mock_provider.generate_response.call_args_list[1] # Get the second call
+    assert second_call_args.kwargs['tool_choice'] == "none" # Verify tool_choice is 'none' for the second call
     # Check prompt includes original messages + assistant tool call + tool result
-    prompt_history = second_call_args.kwargs['prompt']
+    prompt_history = second_call_args.kwargs['prompt'] # Prompt sent in the second call
     assert len(prompt_history) >= 4 # System, User, Assistant (tool call), Tool (result)
     assert prompt_history[-2]['role'] == 'assistant'
     assert prompt_history[-2]['tool_calls'] is not None # Check assistant message had tool calls

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ValidationError
 from typing import Type, Optional, List, Dict, Any
 import json # For potential tool argument parsing later
+import logging # Add logging
 
 # Helper function to safely parse JSON arguments
 def _parse_tool_arguments(tool_name: str, arguments_json: str) -> Dict[str, Any]:
@@ -8,7 +9,6 @@ def _parse_tool_arguments(tool_name: str, arguments_json: str) -> Dict[str, Any]
         return json.loads(arguments_json)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON arguments received for tool '{tool_name}': {arguments_json}") from e
-
 
 # Import base schemas
 from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
@@ -19,6 +19,8 @@ from karo.memory.memory_models import MemoryQueryResult
 from karo.tools.base_tool import BaseTool
 from karo.prompts.system_prompt_builder import SystemPromptBuilder
 
+logger = logging.getLogger(__name__) # Setup logger
+
 class BaseAgentConfig(BaseModel):
     """
     Configuration for the BaseAgent.
@@ -27,20 +29,19 @@ class BaseAgentConfig(BaseModel):
     input_schema: Type[BaseInputSchema] = Field(default=BaseInputSchema, description="The Pydantic model for agent input.")
     output_schema: Type[BaseOutputSchema] = Field(default=BaseOutputSchema, description="The Pydantic model for agent output.")
     prompt_builder: Optional[SystemPromptBuilder] = Field(None, description="Optional SystemPromptBuilder instance. If None, a default one is created.")
-    # system_prompt: Optional[str] = Field(default="You are a helpful assistant.", description="The base system prompt for the agent.") # Replaced by prompt_builder
     memory_manager: Optional[MemoryManager] = Field(None, description="Optional instance of MemoryManager for persistent memory.")
     memory_query_results: int = Field(default=3, description="Number of relevant memories to retrieve if memory_manager is enabled.")
     tools: Optional[List[BaseTool]] = Field(None, description="Optional list of tools available to the agent.")
-    # Add other config fields as needed, e.g., context providers, tool_choice strategy, default_role_description
+    max_tool_iterations: int = Field(default=5, description="Maximum number of tool call iterations before forcing a final response.")
 
     class Config:
-        # Allow custom classes like BaseProvider instances without deep validation
         arbitrary_types_allowed = True
 
 class BaseAgent:
     """
     The fundamental agent class in the Karo framework.
-    Handles interaction with the LLM provider using specified schemas.
+    Handles interaction with the LLM provider using specified schemas,
+    including multi-turn tool execution following a ReAct-like pattern.
     """
     def __init__(self, config: BaseAgentConfig):
         """
@@ -53,8 +54,8 @@ class BaseAgent:
             raise TypeError("config must be an instance of BaseAgentConfig")
 
         self.config = config
-        self.provider = config.provider # Store the provider instance
-        self.memory_manager = config.memory_manager # Store the memory manager instance
+        self.provider = config.provider
+        self.memory_manager = config.memory_manager
 
         # Initialize or store the prompt builder
         if config.prompt_builder:
@@ -70,16 +71,15 @@ class BaseAgent:
 
     def run(self, input_data: BaseInputSchema, **kwargs) -> BaseOutputSchema | AgentErrorSchema:
         """
-        Runs the agent with the given input data.
+        Runs the agent with the given input data, handling potential tool calls.
 
         Args:
-            input_data: An instance of the agent's input schema containing the input data.
-            **kwargs: Additional keyword arguments to pass to the provider's generate_response method
-                      (e.g., temperature, max_tokens).
+            input_data: An instance of the agent's input schema.
+            **kwargs: Additional keyword arguments for the LLM provider (e.g., temperature).
+                      Note: 'tool_choice' might be overridden internally during the ReAct loop.
 
         Returns:
-            An instance of the agent's output schema containing the result,
-            or an AgentErrorSchema if an error occurs.
+            An instance of the agent's output schema or an AgentErrorSchema.
         """
         if not isinstance(input_data, self.config.input_schema):
             return AgentErrorSchema(
@@ -89,169 +89,202 @@ class BaseAgent:
             )
 
         try:
-            # 0. Retrieve relevant memories (if manager exists)
-            retrieved_memories: List[MemoryQueryResult] = []
-            if self.memory_manager:
-                try:
-                    retrieved_memories = self.memory_manager.retrieve_relevant_memories(
-                        query_text=input_data.chat_message,
-                        n_results=self.config.memory_query_results
-                    )
-                except Exception as mem_e:
-                    # Log memory retrieval error but continue without memories
-                    print(f"Warning: Failed to retrieve memories: {mem_e}")
+            # 0. Retrieve relevant memories
+            retrieved_memories = self._retrieve_memories(input_data.chat_message)
 
+            # 1. Format the initial prompt (conversation history)
+            current_prompt = self._create_initial_prompt(input_data.chat_message, retrieved_memories)
 
-            # 1. Format the prompt, potentially including memories
-            prompt = self._create_prompt(input_data.chat_message, retrieved_memories)
+            # --- ReAct Loop (Tool Execution) ---
+            for iteration in range(self.config.max_tool_iterations):
+                logger.debug(f"Agent Run - Iteration {iteration + 1}")
+                logger.debug(f"Sending prompt to LLM (length {len(current_prompt)}): {current_prompt}")
 
-            # 2. Call the LLM via the configured provider, passing tools if available
-            # Note: The provider's generate_response needs to be updated to handle 'tools' and 'tool_choice'
-            # Note: The output_schema might need to be more flexible if tool calls are expected directly
-            #       (e.g., using Union or allowing the raw response). This needs refinement.
-            response = self.provider.generate_response(
-                prompt=prompt,
-                output_schema=self.config.output_schema, # For now, assume direct response or provider handles tool calls internally
-                tools=self.llm_tools,
-                tool_choice="auto" if self.llm_tools else None, # Basic auto tool choice
-                **kwargs # Pass through other LLM parameters
-            )
-
-            # --- Tool Execution Logic ---
-            # Check if the response object has tool_calls (specific to OpenAI client response structure)
-            # We assume the provider returns the raw response object when tools might be called.
-            # Note: This structure might need adjustment for different provider libraries.
-            if hasattr(response, 'choices') and response.choices and response.choices[0].message.tool_calls:
-                tool_calls = response.choices[0].message.tool_calls
-                assistant_message = response.choices[0].message # Keep the assistant message that included the tool calls
-
-                # Append the assistant's message to the prompt history
-                prompt.append(assistant_message.model_dump(exclude_unset=True)) # Use model_dump for OpenAI v1+
-
-                # Execute tools and collect results
-                tool_outputs = []
-                for tool_call in tool_calls:
-                    tool_name = tool_call.function.name
-                    tool_id = tool_call.id
-                    tool_to_call = self.tool_map.get(tool_name)
-
-                    if not tool_to_call:
-                        print(f"Error: LLM requested unknown tool '{tool_name}'")
-                        tool_outputs.append({
-                            "tool_call_id": tool_id,
-                            "role": "tool",
-                            "name": tool_name,
-                            "content": json.dumps({"success": False, "error_message": f"Tool '{tool_name}' not found."})
-                        })
-                        continue # Skip to next tool call
-
-                    try:
-                        # Parse arguments string into a dictionary
-                        arguments_dict = _parse_tool_arguments(tool_name, tool_call.function.arguments)
-
-                        # Validate arguments using the tool's input schema
-                        tool_input_data = tool_to_call.get_input_schema()(**arguments_dict)
-
-                        # Run the tool
-                        tool_output = tool_to_call.run(tool_input_data)
-
-                        # Append successful tool output
-                        tool_outputs.append({
-                            "tool_call_id": tool_id,
-                            "role": "tool",
-                            "name": tool_name,
-                            # Serialize the output schema (which includes success/error)
-                            "content": tool_output.model_dump_json()
-                        })
-
-                    except (ValidationError, ValueError, json.JSONDecodeError) as arg_err:
-                         print(f"Error parsing arguments for tool '{tool_name}': {arg_err}")
-                         tool_outputs.append({
-                            "tool_call_id": tool_id,
-                            "role": "tool",
-                            "name": tool_name,
-                            "content": json.dumps({"success": False, "error_message": f"Invalid arguments provided: {arg_err}"})
-                         })
-                    except Exception as exec_err:
-                         print(f"Error executing tool '{tool_name}': {exec_err}")
-                         tool_outputs.append({
-                            "tool_call_id": tool_id,
-                            "role": "tool",
-                            "name": tool_name,
-                            "content": json.dumps({"success": False, "error_message": f"Tool execution failed: {exec_err}"})
-                         })
-
-                # Append all tool outputs to the prompt history
-                prompt.extend(tool_outputs)
-
-                # Make the second call to the LLM with tool results, asking for final response
-                final_response = self.provider.generate_response(
-                    prompt=prompt,
+                # 2. Call LLM (First call in the loop, potentially requesting tools)
+                response = self.provider.generate_response(
+                    prompt=current_prompt,
                     output_schema=self.config.output_schema,
-                    tool_choice="none", # Ensure LLM doesn't try to call tools again
-                    **kwargs # Pass original kwargs like temperature
+                    tools=self.llm_tools,
+                    tool_choice="auto" if self.llm_tools else None, # Only 'auto' on first real pass
+                    **kwargs
                 )
-                output_data = final_response
 
-            elif isinstance(response, self.config.output_schema):
-                 # If the first response was already the validated output schema (no tool call)
-                 output_data = response
-            else:
-                 # Handle unexpected response type from provider
-                 raise TypeError(f"Unexpected response type from provider: {type(response)}. Expected {self.config.output_schema} or object with tool_calls.")
-            # --- End Tool Execution Logic ---
+                # 3. Check for Tool Calls
+                tool_calls = None
+                assistant_message_content = None
+                raw_message_for_history = None
 
-            return output_data
+                if hasattr(response, 'choices') and response.choices:
+                     message = response.choices[0].message
+                     assistant_message_content = message.content
+                     raw_message_for_history = message.model_dump(exclude_unset=True, exclude_none=True) # Get message dict
+                     if message.tool_calls:
+                         tool_calls = message.tool_calls
+                     else:
+                          # No tool calls, LLM provided a direct answer
+                          logger.debug("LLM provided direct answer. Exiting loop.")
+                          if isinstance(response, self.config.output_schema):
+                              return response # Already validated
+                          elif assistant_message_content:
+                               # Attempt validation if provider returned raw but no tool calls
+                               try:
+                                   validated_response = self.config.output_schema(response_message=assistant_message_content)
+                                   logger.warning("Provider returned raw response without tool calls, manual validation attempted.")
+                                   return validated_response
+                               except Exception as val_err:
+                                    logger.error(f"Failed to validate direct response content: {val_err}")
+                                    return AgentErrorSchema(error_type="OutputValidationError", error_message="LLM response could not be validated.", details=str(assistant_message_content))
+                          else:
+                               logger.error(f"Unexpected raw response type without tool calls or content: {type(response)}")
+                               return AgentErrorSchema(error_type="ProviderResponseError", error_message="Unexpected response from provider.")
+
+                # If no tool calls were detected, exit the loop (should have been handled above)
+                if not tool_calls:
+                    logger.warning("Exiting tool loop: No tool calls detected.")
+                    if isinstance(response, self.config.output_schema):
+                         return response
+                    else:
+                         return AgentErrorSchema(error_type="LogicError", error_message="Agent loop ended unexpectedly without valid response or tool calls.")
+
+                # --- Tool execution proceeds ---
+                logger.debug(f"Detected {len(tool_calls)} tool calls.")
+                # Append assistant's turn (requesting the tool) to history
+                if raw_message_for_history:
+                    current_prompt.append(raw_message_for_history)
+
+                # 4. Execute Tools
+                tool_outputs = self._execute_tool_calls(tool_calls)
+
+                # 5. Append tool results to prompt history
+                current_prompt.extend(tool_outputs)
+
+                # 6. Make the second call to the LLM with tool results
+                logger.debug("Making second LLM call with tool results...")
+                # Filter tool_choice from kwargs to ensure "none" takes precedence
+                final_call_kwargs = {k: v for k, v in kwargs.items() if k != 'tool_choice'}
+                final_response = self.provider.generate_response(
+                    prompt=current_prompt, # Use the updated prompt
+                    output_schema=self.config.output_schema,
+                    tool_choice="none", # Explicitly prevent further tool use
+                    **final_call_kwargs
+                )
+
+                # The response from this second call IS the final answer for this turn.
+                if isinstance(final_response, self.config.output_schema):
+                    logger.debug("Received final validated response after tool execution.")
+                    return final_response
+                else:
+                    # This indicates an issue, maybe the LLM tried to call tools again despite tool_choice="none"
+                    # or the provider/instructor failed to validate the final response.
+                    logger.error(f"Final response after tool execution was not the expected schema: {type(final_response)}")
+                    return AgentErrorSchema(error_type="OutputValidationError", error_message="Failed to get valid final response after tool execution.")
+
+            # End of loop (max iterations reached)
+            logger.warning(f"Max tool iterations ({self.config.max_tool_iterations}) reached without a final answer.")
+            return AgentErrorSchema(error_type="MaxIterationsReached", error_message=f"Agent exceeded maximum tool iterations ({self.config.max_tool_iterations}).")
+
 
         except ValidationError as e:
-            # Handle Pydantic validation errors during output parsing
+            logger.error(f"Pydantic validation error during agent run: {e}", exc_info=True)
             return AgentErrorSchema(
                 error_type="OutputValidationError",
                 error_message="LLM output failed validation against the output schema.",
                 details=str(e)
             )
         except Exception as e:
-            # Handle other potential errors during the LLM call or processing
+            logger.error(f"Unexpected error during agent execution: {e}", exc_info=True)
             return AgentErrorSchema(
                 error_type="RuntimeError",
                 error_message="An unexpected error occurred during agent execution.",
                 details=str(e)
             )
 
-    def _create_prompt(
+    def _retrieve_memories(self, query_text: str) -> List[MemoryQueryResult]:
+        """Helper to retrieve memories, handling potential errors."""
+        if not self.memory_manager:
+            return []
+        try:
+            return self.memory_manager.retrieve_relevant_memories(
+                query_text=query_text,
+                n_results=self.config.memory_query_results
+            )
+        except Exception as mem_e:
+            logger.warning(f"Failed to retrieve memories: {mem_e}", exc_info=True)
+            return []
+
+    def _create_initial_prompt(
         self,
         input_message: str,
         retrieved_memories: Optional[List[MemoryQueryResult]] = None
     ) -> List[Dict[str, str]]:
-        """
-        Creates the list of messages for the LLM API call, incorporating system prompt,
-        retrieved memories (if any), and the current user input.
-
-        Args:
-            input_message: The user's input message string.
-            retrieved_memories: Optional list of relevant memories retrieved.
-
-        Returns:
-            A list of dictionaries formatted for the chat completions API.
-        """
-        # Use the prompt builder to construct the system content
+        """Creates the initial list of messages for the LLM API call."""
         system_content = self.prompt_builder.build(
-            tools=self.llm_tools, # Pass formatted tools
+            tools=self.llm_tools,
             memories=retrieved_memories
         )
-
         messages = []
-        # system_content = self.config.system_prompt or "You are a helpful assistant." # Replaced by builder call
-
-        # Memory formatting is now handled within the builder's build() method
-
         if system_content:
             messages.append({"role": "system", "content": system_content})
-
         # TODO: Add conversation history management here later if needed
-
         messages.append({"role": "user", "content": input_message})
         return messages
+
+    def _execute_tool_calls(self, tool_calls: List[Any]) -> List[Dict[str, str]]:
+         """Executes requested tool calls and returns formatted results."""
+         tool_outputs = []
+         for tool_call in tool_calls:
+             # Structure assumes OpenAI format: tool_call.id, tool_call.function.name, tool_call.function.arguments
+             tool_name = tool_call.function.name
+             tool_id = tool_call.id
+             tool_to_call = self.tool_map.get(tool_name)
+             logger.info(f"Attempting to execute tool: {tool_name} (Call ID: {tool_id})")
+
+             if not tool_to_call:
+                 logger.error(f"LLM requested unknown tool '{tool_name}'")
+                 tool_outputs.append({
+                     "tool_call_id": tool_id,
+                     "role": "tool",
+                     "name": tool_name,
+                     "content": json.dumps({"success": False, "error_message": f"Tool '{tool_name}' not found."})
+                 })
+                 continue
+
+             try:
+                 arguments_dict = _parse_tool_arguments(tool_name, tool_call.function.arguments)
+                 logger.debug(f"Parsed arguments for {tool_name}: {arguments_dict}")
+
+                 tool_input_data = tool_to_call.get_input_schema()(**arguments_dict)
+                 logger.debug(f"Validated input data for {tool_name}: {tool_input_data}")
+
+                 tool_output = tool_to_call.run(tool_input_data)
+                 logger.info(f"Tool '{tool_name}' executed successfully.")
+                 logger.debug(f"Tool '{tool_name}' output: {tool_output}")
+
+                 tool_outputs.append({
+                     "tool_call_id": tool_id,
+                     "role": "tool",
+                     "name": tool_name,
+                     "content": tool_output.model_dump_json() # Serialize the Pydantic output model
+                 })
+
+             except (ValidationError, ValueError, json.JSONDecodeError) as arg_err:
+                  logger.error(f"Argument error for tool '{tool_name}': {arg_err}", exc_info=True)
+                  tool_outputs.append({
+                     "tool_call_id": tool_id,
+                     "role": "tool",
+                     "name": tool_name,
+                     "content": json.dumps({"success": False, "error_message": f"Invalid arguments provided: {arg_err}"})
+                  })
+             except Exception as exec_err:
+                  logger.error(f"Execution error for tool '{tool_name}': {exec_err}", exc_info=True)
+                  tool_outputs.append({
+                     "tool_call_id": tool_id,
+                     "role": "tool",
+                     "name": tool_name,
+                     "content": json.dumps({"success": False, "error_message": f"Tool execution failed: {exec_err}"})
+                  })
+         return tool_outputs
+
 
     def _prepare_llm_tools(self) -> Optional[List[Dict[str, Any]]]:
         """
@@ -280,7 +313,7 @@ class BaseAgent:
                 }
                 llm_tools.append(tool_config)
             except Exception as e:
-                print(f"Warning: Failed to prepare tool '{tool.get_name()}' for LLM: {e}")
+                logger.warning(f"Failed to prepare tool '{tool.get_name()}' for LLM: {e}", exc_info=True)
                 # Optionally skip the tool or raise a more specific error
 
         return llm_tools if llm_tools else None
