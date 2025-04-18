@@ -1,0 +1,1 @@
+# Memory components for the Karo framework
