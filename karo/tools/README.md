@@ -6,7 +6,7 @@ This directory contains tools that can be used by Karo agents to perform specifi
 
 *   **`BaseTool` (`base_tool.py`):** An Abstract Base Class (ABC) defining the standard interface for all tools. It requires subclasses to define `input_schema`, `output_schema`, `__init__`, and `run` methods. It also provides optional `name` and `description` attributes used for identification and informing the LLM.
 *   **Tool Schemas (`BaseToolInputSchema`, `BaseToolOutputSchema`):** Base Pydantic models that tool-specific input/output schemas should inherit from. This promotes consistency.
-*   **Concrete Tools (e.g., `calculator_tool.py`):** Classes inheriting from `BaseTool` that implement a specific functionality. Each tool defines its unique input/output schemas and the logic within its `run` method.
+*   **Concrete Tools (e.g., `calculator_tool.py`, `document_reader_tool.py`):** Classes inheriting from `BaseTool` that implement a specific functionality. Each tool defines its unique input/output schemas and the logic within its `run` method.
 
 ## How Tools Integrate with `BaseAgent`
 
@@ -37,3 +37,10 @@ This directory contains tools that can be used by Karo agents to perform specifi
     *   Handle potential errors gracefully.
     *   Return an instance of your tool's output schema, correctly setting the `success` flag and `error_message` if applicable.
 6.  **Instantiate and Use:** Instantiate your new tool and add it to the `tools` list in the `BaseAgentConfig` when creating an agent.
+
+## Built-in Tools
+
+Karo aims to provide some common tools out-of-the-box:
+
+*   **`CalculatorTool` (`calculator_tool.py`):** Performs basic arithmetic operations.
+*   **`DocumentReaderTool` (`document_reader_tool.py`):** Reads text content from `.txt`, `.md`, `.pdf`, and `.docx` files. Requires optional dependencies `pypdf` and `python-docx` for PDF/DOCX support.

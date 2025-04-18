@@ -20,7 +20,7 @@ This command will download and install the latest stable version of Karo and its
 
 ## Installing Optional Dependencies
 
-Some components, like specific database integrations or tools, might require extra dependencies. These can often be installed as extras.
+Some components, like specific database integrations or built-in tools, might require extra dependencies. These can often be installed as extras if configured, or directly using pip.
 
 *   **For Excel Reading:** If you plan to use tools that read `.xlsx` files (like the `ExcelReaderTool` example), you'll need `openpyxl`:
     ```bash
@@ -38,6 +38,12 @@ Some components, like specific database integrations or tools, might require ext
     ```bash
     pip install rich
     ```
+
+*   **For PDF/DOCX Reading:** Karo includes a `DocumentReaderTool`. To enable reading from `.pdf` and `.docx` files with this tool, you need to install the required libraries:
+    ```bash
+    pip install pypdf python-docx
+    ```
+    *(Or potentially `pip install karo[docs]` if an extra is configured)*
 
 ## Environment Variables
 

@@ -1,6 +1,7 @@
 import os
 import instructor
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
 from typing import Any, Type, List, Dict

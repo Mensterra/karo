@@ -12,11 +12,12 @@ def _parse_tool_arguments(tool_name: str, arguments_json: str) -> Dict[str, Any]
 
 # Import base schemas
 from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
-# Import provider base, memory components, and tool base
+# Import provider base, memory components, tool base, and prompt builder
 from karo.providers.base_provider import BaseProvider
 from karo.memory.memory_manager import MemoryManager
 from karo.memory.memory_models import MemoryQueryResult
 from karo.tools.base_tool import BaseTool
+from karo.prompts.system_prompt_builder import SystemPromptBuilder
 
 class BaseAgentConfig(BaseModel):
     """
@@ -25,11 +26,12 @@ class BaseAgentConfig(BaseModel):
     provider: BaseProvider = Field(..., description="An instance of a class derived from BaseProvider (e.g., OpenAIProvider).")
     input_schema: Type[BaseInputSchema] = Field(default=BaseInputSchema, description="The Pydantic model for agent input.")
     output_schema: Type[BaseOutputSchema] = Field(default=BaseOutputSchema, description="The Pydantic model for agent output.")
-    system_prompt: Optional[str] = Field(default="You are a helpful assistant.", description="The base system prompt for the agent.")
+    prompt_builder: Optional[SystemPromptBuilder] = Field(None, description="Optional SystemPromptBuilder instance. If None, a default one is created.")
+    # system_prompt: Optional[str] = Field(default="You are a helpful assistant.", description="The base system prompt for the agent.") # Replaced by prompt_builder
     memory_manager: Optional[MemoryManager] = Field(None, description="Optional instance of MemoryManager for persistent memory.")
     memory_query_results: int = Field(default=3, description="Number of relevant memories to retrieve if memory_manager is enabled.")
     tools: Optional[List[BaseTool]] = Field(None, description="Optional list of tools available to the agent.")
-    # Add other config fields as needed, e.g., context providers, tool_choice strategy
+    # Add other config fields as needed, e.g., context providers, tool_choice strategy, default_role_description
 
     class Config:
         # Allow custom classes like BaseProvider instances without deep validation
@@ -53,6 +55,13 @@ class BaseAgent:
         self.config = config
         self.provider = config.provider # Store the provider instance
         self.memory_manager = config.memory_manager # Store the memory manager instance
+
+        # Initialize or store the prompt builder
+        if config.prompt_builder:
+            self.prompt_builder = config.prompt_builder
+        else:
+            # Create a default builder if none provided
+            self.prompt_builder = SystemPromptBuilder(role_description="You are a helpful assistant.")
 
         # Process tools
         self.tools = config.tools or []
@@ -225,18 +234,16 @@ class BaseAgent:
         Returns:
             A list of dictionaries formatted for the chat completions API.
         """
-        messages = []
-        system_content = self.config.system_prompt or "You are a helpful assistant."
+        # Use the prompt builder to construct the system content
+        system_content = self.prompt_builder.build(
+            tools=self.llm_tools, # Pass formatted tools
+            memories=retrieved_memories
+        )
 
-        # Format memories into the system prompt or a separate context message
-        # Simple approach: prepend to system prompt
-        if retrieved_memories:
-            memory_context = "\n\nRelevant previous information:\n"
-            for i, mem in enumerate(retrieved_memories):
-                # Include timestamp or other metadata if useful
-                timestamp_str = mem.record.timestamp.strftime('%Y-%m-%d %H:%M')
-                memory_context += f"- ({timestamp_str}): {mem.record.text}\n"
-            system_content += memory_context
+        messages = []
+        # system_content = self.config.system_prompt or "You are a helpful assistant." # Replaced by builder call
+
+        # Memory formatting is now handled within the builder's build() method
 
         if system_content:
             messages.append({"role": "system", "content": system_content})
