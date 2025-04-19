@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "karo-excel-summarizer-example"
-version = "0.1.0"
+version = "0.2.0"
 description = "Example using Karo framework to summarize Excel files."
-authors = ["Your Name <you@example.com>"] # Adjust as needed
+authors = ["Mensterra <support@mensterra.com>"] # Adjust as needed
 readme = "README.md"
 packages = [{ include = "karo", from = "../.."}] # Include karo from parent
 

@@ -1,7 +1,8 @@
 # Karo Framework
 
 [![PyPI version](https://badge.fury.io/py/karo.svg)](https://badge.fury.io/py/karo) <!-- Placeholder badge -->
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <!-- Placeholder badge -->
+<!-- [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  -->
+<!-- Placeholder badge -->
 
 Karo is a modular Python framework designed for building robust and maintainable AI agent applications. It emphasizes:
 
@@ -26,7 +27,6 @@ Inspired by frameworks like Atomic Agents, Karo aims to provide developers with 
 ```bash
 pip install karo
 ```
-*(Note: Replace `karo` with the actual package name if different)*
 
 See the full [Installation Guide](./docs/installation.md) for details on setting up dependencies and environment variables (like `OPENAI_API_KEY`).
 
@@ -72,10 +72,15 @@ Full documentation, including guides and API references, can be found in the `do
 *   [Quickstart Guide](./docs/quickstart.md)
 *   *(More guides coming soon)*
 
-## Contributing
+<!-- ## Contributing
 
-Contributions are welcome! Please see the [Contributing Guidelines](./CONTRIBUTING.md) for more information.
+Contributions are welcome! Please see the [Contributing Guidelines](./CONTRIBUTING.md) for more information. -->
 
 ## License
 
-Karo is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+Karo is a proprietary (for now) software product by Mensterra. All rights reserved.
+
+This package is provided for use under the terms of a commercial license.  
+Unauthorized copying, modification, or distribution of the source code is prohibited.
+
+For licensing inquiries, please contact [support@mensterra.com](mailto:support@mensterra.com).

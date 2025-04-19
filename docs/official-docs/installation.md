@@ -13,6 +13,45 @@ The recommended way to install Karo is using pip:
 
 ```bash
 pip install karo
+
+### Optional Dependencies
+
+Karo uses external libraries for certain features. Install these if you need the corresponding functionality:
+
+*   **Document Reading:** To enable the `DocumentReaderTool` to read PDF and DOCX files:
+    ```bash
+    pip install pypdf python-docx
+    ```
+*   **Anthropic Provider:** To use Anthropic Claude models:
+    ```bash
+    pip install anthropic
+    ```
+    You will also need to set the `ANTHROPIC_API_KEY` environment variable.
+
+### Environment Variables
+
+Karo relies on environment variables for API keys:
+
+*   `OPENAI_API_KEY`: Required for OpenAI models and the default embedding model used by `ChromaDBService`.
+*   `ANTHROPIC_API_KEY`: Required when using the `AnthropicProvider`.
+*   `GOOGLE_API_KEY`: Required when using the `OpenAIProvider` configured for Gemini's OpenAI-compatible endpoint.
+
+It's recommended to use a `.env` file in your project root and load it using `python-dotenv` (`pip install python-dotenv`):
+
+**`.env` example:**
+```dotenv
+OPENAI_API_KEY='sk-...'
+ANTHROPIC_API_KEY='sk-ant-...'
+GOOGLE_API_KEY='AIza...'
+```
+
+Load it in your Python script *before* initializing Karo components:
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+# Now initialize providers, memory managers, etc.
+```
 ```
 *(Note: Replace `karo` with the actual package name if it's different upon publishing).*
 

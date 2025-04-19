@@ -1,130 +1,116 @@
 import os
-import instructor
 from dotenv import load_dotenv
-from pydantic import BaseModel
-from rich.console import Console
-from rich.panel import Panel
-from typing import Any, Type, List, Dict
+from pydantic import SecretStr
+
+# Import Karo components
+from karo.core.base_agent import BaseAgent, BaseAgentConfig
+from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
+from karo.providers.anthropic_provider import AnthropicProvider, AnthropicProviderConfig # Import Anthropic
+from karo.prompts.system_prompt_builder import SystemPromptBuilder
+from karo.schemas.base_schemas import BaseInputSchema
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Import Karo components
-from karo.core.base_agent import BaseAgent, BaseAgentConfig
-from karo.providers.base_provider import BaseProvider
-from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
+# --- Configuration ---
+# Ensure you have OPENAI_API_KEY, ANTHROPIC_API_KEY, and GOOGLE_API_KEY (for Gemini) in your .env file
 
-# Initialize console for rich output
-console = Console()
+# 1. OpenAI Configuration
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    print("Warning: OPENAI_API_KEY not found in environment variables.")
+openai_config = OpenAIProviderConfig(
+    model="gpt-4o-mini",
+    api_key=SecretStr(openai_api_key) if openai_api_key else None
+)
 
-# --- Define a Mock Provider for Demonstration ---
-class MockProviderConfig(BaseModel):
-    model: str = "mock-model"
-    mock_response: str = "This is a mock response."
+# 2. Anthropic Configuration
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+if not anthropic_api_key:
+    print("Warning: ANTHROPIC_API_KEY not found in environment variables.")
+anthropic_config = AnthropicProviderConfig(
+    model="claude-3-haiku-20240307", # Use a cost-effective model
+    api_key=SecretStr(anthropic_api_key) if anthropic_api_key else None
+)
 
-class MockProvider(BaseProvider):
-    """A simple mock provider for demonstrating provider swapping."""
-    def __init__(self, config: MockProviderConfig):
-        self.config = config
-        # No real client needed for mock
-        self.client = None
+# 3. Gemini Configuration (using OpenAIProvider with compatibility endpoint)
+gemini_api_key = os.getenv("GOOGLE_API_KEY") # Google uses GOOGLE_API_KEY
+if not gemini_api_key:
+    print("Warning: GOOGLE_API_KEY not found in environment variables (needed for Gemini).")
+gemini_config = OpenAIProviderConfig(
+    model="gemini-1.5-flash-latest", # Or other compatible Gemini model
+    api_key=SecretStr(gemini_api_key) if gemini_api_key else None,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/" # Gemini's OpenAI-compatible endpoint
+)
 
-    def get_client(self) -> Any:
-        return self.client # Returns None
+# --- Provider Initialization ---
+providers = {}
+try:
+    if openai_config.api_key:
+        providers["openai"] = OpenAIProvider(config=openai_config)
+        print(f"Initialized OpenAI Provider with model: {providers['openai'].get_model_name()}")
+    else:
+        print("Skipping OpenAI initialization (no API key).")
+except Exception as e:
+    print(f"Error initializing OpenAI Provider: {e}")
 
-    def get_model_name(self) -> str:
-        return self.config.model
+try:
+    if anthropic_config.api_key:
+        providers["anthropic"] = AnthropicProvider(config=anthropic_config)
+        print(f"Initialized Anthropic Provider with model: {providers['anthropic'].get_model_name()}")
+    else:
+        print("Skipping Anthropic initialization (no API key).")
+except Exception as e:
+    print(f"Error initializing Anthropic Provider: {e}")
 
-    def generate_response(
-        self,
-        prompt: List[Dict[str, str]],
-        output_schema: Type[BaseOutputSchema],
-        **kwargs
-    ) -> BaseOutputSchema:
-        # Simulate generating a response based on the output schema
-        # For simplicity, we assume BaseOutputSchema with 'response_message'
-        user_message = next((msg['content'] for msg in prompt if msg['role'] == 'user'), "Unknown input")
-        response_text = f"{self.config.mock_response} (Input was: '{user_message[:30]}...')"
+try:
+    if gemini_config.api_key:
+        # Use OpenAIProvider for Gemini's compatible endpoint
+        providers["gemini"] = OpenAIProvider(config=gemini_config)
+        print(f"Initialized Gemini Provider (via OpenAI compatibility) with model: {providers['gemini'].get_model_name()}")
+    else:
+        print("Skipping Gemini initialization (no API key).")
+except Exception as e:
+    print(f"Error initializing Gemini Provider (via OpenAI compatibility): {e}")
 
-        # Create an instance of the expected output schema
-        # This assumes the output_schema has a 'response_message' field.
-        # A more robust mock might inspect the schema fields.
-        if hasattr(output_schema, 'model_fields') and 'response_message' in output_schema.model_fields:
-             return output_schema(response_message=response_text)
+
+# --- Agent Setup & Testing Loop ---
+print("\n--- Testing Initialized Providers ---")
+
+for provider_key, selected_provider in providers.items():
+    print(f"\n--- Running Agent with {provider_key.upper()} ---")
+
+    # Basic Prompt Builder
+    prompt_builder = SystemPromptBuilder(
+        role_description=f"You are a helpful assistant running on the {provider_key} provider.", # Use the loop variable 'provider_key'
+        core_instructions="Answer concisely."
+    )
+
+    # Agent Config
+    agent_config = BaseAgentConfig(
+        provider=selected_provider,
+        prompt_builder=prompt_builder
+    )
+
+    # Create Agent
+    agent = BaseAgent(config=agent_config)
+
+    # Run Agent
+    user_message = "What is the capital of France?"
+    input_data = BaseInputSchema(chat_message=user_message)
+    print(f"User: {user_message}")
+
+    try:
+        result = agent.run(input_data)
+        if hasattr(result, 'response_message'):
+            print(f"Agent ({provider_key}): {result.response_message}") # Use loop variable
         else:
-             # Fallback or raise error if schema doesn't match expectation
-             raise TypeError(f"MockProvider cannot fulfill unexpected output schema: {output_schema.__name__}")
+            print(f"Agent ({provider_key}) Raw Output: {result}") # Use loop variable
+    except Exception as e:
+        print(f"Agent ({provider_key}) Error: {e}") # Use loop variable
 
+# End of loop
+if not providers:
+    print("\nNo providers were successfully initialized. Cannot run agent tests.")
 
-def main():
-    console.print(Panel("[bold cyan]Karo Framework - Multi-Provider Setup Example[/bold cyan]", title="Welcome", expand=False))
-
-    # --- Provider 1: OpenAI ---
-    console.print("\n--- Configuring OpenAI Provider ---")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        console.print("[bold red]Skipping OpenAI:[/bold red] OPENAI_API_KEY not set.")
-        openai_provider = None
-    else:
-        openai_provider_config = OpenAIProviderConfig(model="gpt-4o-mini")
-        try:
-            openai_provider = OpenAIProvider(config=openai_provider_config)
-            console.print(f"[green]✓ OpenAI Provider Initialized (Model: {openai_provider.get_model_name()})[/green]")
-        except Exception as e:
-            console.print(f"[bold red]Error initializing OpenAI Provider:[/bold red] {e}")
-            openai_provider = None
-
-    # --- Provider 2: Mock Provider ---
-    console.print("\n--- Configuring Mock Provider ---")
-    mock_provider_config = MockProviderConfig()
-    mock_provider = MockProvider(config=mock_provider_config)
-    console.print(f"[green]✓ Mock Provider Initialized (Model: {mock_provider.get_model_name()})[/green]")
-
-
-    # --- Agent Configuration ---
-    console.print("\n--- Configuring Agents ---")
-    openai_agent = None
-    if openai_provider:
-        openai_agent_config = BaseAgentConfig(provider=openai_provider)
-        openai_agent = BaseAgent(config=openai_agent_config)
-        console.print("[green]✓ OpenAI Agent Configured[/green]")
-
-    mock_agent_config = BaseAgentConfig(provider=mock_provider)
-    mock_agent = BaseAgent(config=mock_agent_config)
-    console.print("[green]✓ Mock Agent Configured[/green]")
-
-
-    # --- Interaction Demonstration ---
-    console.print("\n--- Running Interaction ---")
-    input_text = "Tell me about the Karo framework."
-    input_data = BaseInputSchema(chat_message=input_text)
-    console.print(f"[bold blue]Input:[/bold blue] {input_text}")
-
-    # Run with OpenAI Agent (if available)
-    if openai_agent:
-        console.print("\n[yellow]Running with OpenAI Agent...[/yellow]")
-        result_openai = openai_agent.run(input_data)
-        if isinstance(result_openai, BaseOutputSchema):
-            console.print(f"[bold green]OpenAI Agent:[/bold green] {result_openai.response_message}")
-        elif isinstance(result_openai, AgentErrorSchema):
-            console.print(f"[bold red]OpenAI Agent Error:[/bold red] {result_openai.error_type}")
-    else:
-        console.print("\n[yellow]Skipping OpenAI Agent run (provider not initialized).[/yellow]")
-
-
-    # Run with Mock Agent
-    console.print("\n[yellow]Running with Mock Agent...[/yellow]")
-    result_mock = mock_agent.run(input_data)
-    if isinstance(result_mock, BaseOutputSchema):
-        console.print(f"[bold green]Mock Agent:[/bold green] {result_mock.response_message}")
-    elif isinstance(result_mock, AgentErrorSchema):
-         console.print(f"[bold red]Mock Agent Error:[/bold red] {result_mock.error_type}")
-
-
-    console.print("\n[bold cyan]Example finished. Notice how the BaseAgent uses whichever provider it was configured with.[/bold cyan]")
-
-
-if __name__ == "__main__":
-    # Ensure python-dotenv and rich are installed
-    main()
+print("\nMulti-provider setup example finished.")
