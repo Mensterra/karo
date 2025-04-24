@@ -1,16 +1,18 @@
 import instructor
-import openai
 from openai import OpenAI, APIError, RateLimitError # Import specific errors if needed for handling
 from pydantic import BaseModel, Field, SecretStr, HttpUrl, ValidationError
-from typing import Any, Type, List, Dict, Optional, Union
+from typing import Any, Type, List, Dict, Optional
 
 from karo.providers.base_provider import BaseProvider
-from karo.schemas.base_schemas import BaseOutputSchema, AgentErrorSchema # For potential error wrapping
+from karo.schemas.base_schemas import BaseOutputSchema
+
+from typing import Literal # Import Literal
 
 class OpenAIProviderConfig(BaseModel):
     """
     Configuration specific to the OpenAI provider.
     """
+    type: Literal["openai"] = Field("openai", description="Discriminator field for provider type.")
     api_key: Optional[SecretStr] = Field(None, description="OpenAI API key. If None, attempts to use environment variable OPENAI_API_KEY.")
     base_url: Optional[HttpUrl] = Field(None, description="Optional custom base URL for the OpenAI API (e.g., for proxies).")
     organization: Optional[str] = Field(None, description="Optional OpenAI organization ID.")
@@ -66,28 +68,20 @@ class OpenAIProvider(BaseProvider):
         self,
         prompt: List[Dict[str, str]],
         output_schema: Type[BaseOutputSchema],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[str] = None,
+        # Removed tools and tool_choice parameters
         **kwargs
-    ) -> Union[BaseOutputSchema, Any]: # Updated return type
+    ) -> BaseOutputSchema: # Return type is now always the validated schema
         """
-        Generates a response from the OpenAI LLM, potentially using tools.
-
-        If tools are provided and the LLM chooses to use one, this method returns
-        the raw ChatCompletion object containing tool_calls. Otherwise, it returns
-        an instance of the validated output_schema.
+        Generates a response from the OpenAI LLM, enforcing the output schema.
 
         Args:
             prompt: The message list for the chat completion.
-            output_schema: The Pydantic model for the final desired response structure.
-            tools: Optional list of tools in OpenAI API format.
-            tool_choice: Optional tool choice parameter for OpenAI API.
+            output_schema: The Pydantic model for the desired response structure.
             **kwargs: Additional arguments for the OpenAI chat completions API
                       (e.g., temperature, max_tokens).
 
         Returns:
-            - An instance of output_schema if the response is a direct answer.
-            - The raw ChatCompletion object if the response includes tool calls.
+            An instance of output_schema.
 
         Raises:
             APIError: If the OpenAI API returns an error.
@@ -100,30 +94,18 @@ class OpenAIProvider(BaseProvider):
             api_kwargs = {
                 "model": self.config.model,
                 "messages": prompt,
+                "response_model": output_schema, # Always enforce the output schema
                 **kwargs
             }
 
-            # Add tools and tool_choice if provided
-            if tools:
-                api_kwargs["tools"] = tools
-                if tool_choice:
-                    api_kwargs["tool_choice"] = tool_choice
-                # When tools are present, instructor expects the raw response
-                # to check for tool_calls, but it still needs response_model
-                # for the case where the LLM *doesn't* call a tool.
-                api_kwargs["response_model"] = output_schema # Always include response_model
-            else:
-                # If no tools, expect direct validation against output_schema
-                api_kwargs["response_model"] = output_schema
-
+            # Removed logic for adding tools and tool_choice
 
             # Make the API call using the instructor-patched client
+            # Instructor will handle validation against the output_schema
             response = self.client.chat.completions.create(**api_kwargs)
 
-            # If tools were provided, the response might be the raw ChatCompletion object
-            # containing tool_calls, or it might be the validated output_schema if
-            # the LLM decided not to use a tool (instructor handles this).
-            # If no tools were provided, response should be the validated output_schema.
+            # Response should now always be the validated output_schema instance
+            # due to instructor's handling when response_model is provided.
             return response
 
         except ValidationError as e:

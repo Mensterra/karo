@@ -1,6 +1,6 @@
 from pydantic import Field
-from typing import Optional, Dict, Any, List, Type # Added Type
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, Type # Added Type
+from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
 import uuid # Import uuid
@@ -9,8 +9,6 @@ import uuid # Import uuid
 from karo.tools.base_tool import BaseTool, BaseToolInputSchema, BaseToolOutputSchema
 
 from karo.memory.services.chromadb_service import ChromaDBService
-# MemoryRecord is no longer directly instantiated here after previous refactor
-# from karo.memory.memory_models import MemoryRecord
 
 logger = logging.getLogger(__name__)
 

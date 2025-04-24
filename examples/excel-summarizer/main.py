@@ -1,6 +1,5 @@
 import argparse
 import os
-import instructor
 from dotenv import load_dotenv
 from rich.console import Console
 from pydantic import Field

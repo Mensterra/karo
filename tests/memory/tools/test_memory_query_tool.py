@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock
 from datetime import datetime, timezone # Added timezone
 
 # Modules to test
-from karo.memory.tools.memory_query_tool import MemoryQueryTool, MemoryQueryInput, MemoryQueryOutput
+from karo.memory.tools.memory_query_tool import MemoryQueryTool, MemoryQueryInput
 from karo.memory.services.chromadb_service import ChromaDBService # Needed for type hint and mocking
 from karo.memory.memory_models import MemoryRecord, MemoryQueryResult # Needed for output structure
 

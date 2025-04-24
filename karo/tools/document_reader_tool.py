@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, Any, List
+from typing import Optional, Any
 from pydantic import Field, FilePath
 
 # Import base tool and schemas

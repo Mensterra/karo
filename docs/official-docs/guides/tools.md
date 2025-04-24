@@ -23,26 +23,79 @@ Karo provides some common tools ready to use:
     *   **Output:** `DocumentReaderOutput(content: Optional[str], file_path: Optional[str], success: bool, error_message: Optional[str])`
     *   **Dependencies:** Requires `pypdf` and `python-docx` to be installed for PDF/DOCX support (`pip install pypdf python-docx`).
 
-**How to Use:**
+**How to Use (Refactored Approach):**
 
-1.  **Import:** Import the desired tool class (e.g., `from karo.tools.calculator_tool import CalculatorTool`).
-2.  **Instantiate:** Create an instance of the tool: `calculator = CalculatorTool()`. Some tools might require configuration during instantiation (like the memory tools needing a `MemoryManager`).
-3.  **Configure Agent:** Pass a list containing the tool instance(s) to the `tools` argument of `BaseAgentConfig`:
+1.  **Import & Instantiate Tool:** Import the tool class and create an instance, providing any necessary configuration.
     ```python
-    from karo.core.base_agent import BaseAgentConfig
-    from karo.tools.calculator_tool import CalculatorTool
-    # ... other imports (provider, etc.)
+    from karo.tools.calculator_tool import CalculatorTool, CalculatorInput
+    # ... other imports
 
     calculator = CalculatorTool()
-    # reader = DocumentReaderTool() # If needed
+    # Store instantiated tools for lookup, e.g., in a dictionary
+    available_tools = {calculator.get_name(): calculator}
+    ```
+2.  **Define Agent Output Schema:** Create or use an output schema for your agent that allows it to specify *which* tool to use and the *parameters* for that tool. This schema should inherit from `BaseOutputSchema`.
+    ```python
+    from pydantic import Field
+    from typing import Union, Optional
+    from karo.schemas.base_schemas import BaseOutputSchema
+    # Import input schemas for the tools the agent might call
+    from karo.tools.calculator_tool import CalculatorInput
+    # from karo.tools.memory_query_tool import MemoryQueryInput # etc.
+
+    class OrchestrationOutputSchema(BaseOutputSchema):
+        tool_name: Optional[str] = Field(None, description="The name of the tool to execute.")
+        tool_parameters: Optional[Union[CalculatorInput, ...]] = Field(None, description="The input parameters for the selected tool.")
+        direct_response: Optional[str] = Field(None, description="Direct response if no tool needed.")
+        # Add validation logic if needed (e.g., ensure tool_name+params OR direct_response)
+    ```
+3.  **Configure Agent:** Configure your `BaseAgent` instance, setting its `output_schema` to the orchestration schema you defined. **Do not** pass tools directly to the agent config anymore.
+    ```python
+    from karo.core.base_agent import BaseAgent, BaseAgentConfig
+    # ... other imports
 
     agent_config = BaseAgentConfig(
         provider=my_provider,
-        tools=[calculator] # Add tool instances here
-        # ... other config
+        output_schema=OrchestrationOutputSchema, # Use the orchestration schema
+        # ... other config (memory, prompt_builder)
     )
+    agent = BaseAgent(config=agent_config)
     ```
-4.  **Instruct the Agent:** Ensure your system prompt (via `SystemPromptBuilder`) clearly explains what each tool does and when the agent should consider using it. The agent relies on the tool's `name` and `description` provided to the LLM.
+4.  **Instruct the Agent:** Modify the agent's system prompt to instruct it:
+    *   About the available tools (by name and description).
+    *   To decide if a tool is needed based on the user query.
+    *   If a tool is needed, to respond using the `OrchestrationOutputSchema` format, populating `tool_name` and `tool_parameters` (matching the specific tool's input schema).
+    *   If no tool is needed, to populate the `direct_response` field instead.
+5.  **Implement External Orchestration Logic:** In your application code where you call `agent.run()`:
+    *   Receive the agent's output (which should be an instance of `OrchestrationOutputSchema`).
+    *   Check if `agent_output.tool_name` is set.
+    *   If yes:
+        *   Look up the corresponding tool instance (e.g., from the `available_tools` dictionary).
+        *   Call `tool_instance.run(agent_output.tool_parameters)`.
+        *   Process the tool's result.
+    *   If no `tool_name` is set, use `agent_output.direct_response`.
+
+    ```python
+    # --- In your application loop ---
+    agent_output = agent.run(user_input_data)
+
+    if isinstance(agent_output, OrchestrationOutputSchema):
+        if agent_output.tool_name and agent_output.tool_parameters:
+            tool_to_run = available_tools.get(agent_output.tool_name)
+            if tool_to_run:
+                print(f"Executing tool: {agent_output.tool_name}")
+                tool_result = tool_to_run.run(agent_output.tool_parameters)
+                print(f"Tool result: {tool_result}")
+                # Process tool_result...
+            else:
+                print(f"Error: Agent requested unknown tool '{agent_output.tool_name}'")
+        elif agent_output.direct_response:
+            print(f"Agent response: {agent_output.direct_response}")
+        else:
+            print("Agent returned no action.")
+    # Handle AgentErrorSchema etc.
+    # --- End application loop snippet ---
+    ```
 
 ## Creating Custom Tools
 
@@ -141,4 +194,4 @@ Building your own tools is straightforward:
 
     ```
 
-5.  **Use the Tool:** Instantiate your custom tool and add it to the `tools` list in `BaseAgentConfig` just like a built-in tool. Make sure your agent's system prompt describes the new tool appropriately.
+5.  **Use the Tool:** Instantiate your custom tool and make it available to your external orchestration logic (e.g., add it to the `available_tools` dictionary). Update your agent's system prompt and `OrchestrationOutputSchema` (specifically the `Union` in `tool_parameters`) to include the new tool and its input schema. Ensure your orchestration logic can handle the new `tool_name` when the agent requests it.

@@ -2,7 +2,7 @@ import chromadb
 from chromadb.config import Settings
 from chromadb.api.models.Collection import Collection
 from chromadb.utils import embedding_functions
-from pydantic import BaseModel, Field, HttpUrl, SecretStr, ValidationError
+from pydantic import BaseModel, Field, SecretStr
 from typing import List, Dict, Optional, Any
 import os
 import logging

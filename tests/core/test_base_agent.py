@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock
 from pydantic import ValidationError
 from typing import Any, Type, List, Dict, Optional
 from typing import Any, Type, List, Dict, Optional, Union # Added Union
@@ -10,7 +10,6 @@ import json
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
 from karo.providers.base_provider import BaseProvider
-from karo.tools.base_tool import BaseTool
 from karo.tools.calculator_tool import CalculatorTool, CalculatorInput, CalculatorOutput # Import example tool
 from karo.prompts.system_prompt_builder import SystemPromptBuilder # Import builder
 

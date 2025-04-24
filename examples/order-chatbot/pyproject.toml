@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "karo-order-chatbot-example"
+version = "0.3.0"
+description = "Example chatbot using Karo framework for order status lookup and FAQ."
+authors = ["Mensterra <support@mensterra.com>"] # Adjust as needed
+readme = "README.md"
+packages = [{ include = "karo", from = "../.."}] # Include karo from parent
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+# Assume karo is installed separately or via path dependency if needed
+# karo = {path = "../../", develop = true} # Example if running locally
+python-dotenv = "^1.0.0"
+rich = "^13.7.0"
+pandas = "^2.0.0" # Dependency for the CSV reader tool
+# Add instructor and openai if not pulled in by karo dependency
+# instructor = "^1.0"
+# openai = "^1.0"
+# Add chromadb if not pulled in by karo dependency
+# chromadb = "^0.5.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

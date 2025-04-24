@@ -1,8 +1,8 @@
 import pytest
-import math
+
 
 # Module to test
-from karo.tools.calculator_tool import CalculatorTool, CalculatorInput, CalculatorOutput
+from karo.tools.calculator_tool import CalculatorTool, CalculatorInput
 
 # --- Fixtures ---
 

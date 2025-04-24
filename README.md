@@ -1,7 +1,7 @@
 # Karo Framework
 
 [![PyPI version](https://badge.fury.io/py/karo.svg)](https://badge.fury.io/py/karo) <!-- Placeholder badge -->
-<!-- [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  -->
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 <!-- Placeholder badge -->
 
 Karo is a modular Python framework designed for building robust and maintainable AI agent applications. It emphasizes:
@@ -78,9 +78,16 @@ Contributions are welcome! Please see the [Contributing Guidelines](./CONTRIBUTI
 
 ## License
 
-Karo is a proprietary (for now) software product by Mensterra. All rights reserved.
+Copyright 2025 Mensterra
 
-This package is provided for use under the terms of a commercial license.  
-Unauthorized copying, modification, or distribution of the source code is prohibited.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-For licensing inquiries, please contact [support@mensterra.com](mailto:support@mensterra.com).
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

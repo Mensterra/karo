@@ -7,14 +7,15 @@ from anthropic import APIError, RateLimitError
 from karo.providers.base_provider import BaseProvider
 from karo.schemas.base_schemas import BaseOutputSchema
 from pydantic import BaseModel, Field, SecretStr, ValidationError
-from typing import Any, Type, List, Dict, Optional, Union
-import os
+from typing import Any, Type, List, Dict, Optional
 import logging
-import json # For tool result content
 
 logger = logging.getLogger(__name__)
 
+from typing import Literal # Import Literal
+
 class AnthropicProviderConfig(BaseModel):
+    type: Literal["anthropic"] = Field("anthropic", description="Discriminator field for provider type.")
     api_key: Optional[SecretStr] = Field(None, description="Anthropic API key. Uses ANTHROPIC_API_KEY env var if None.")
     model: str = Field(..., description="Anthropic model name (e.g., 'claude-3-opus-20240229', 'claude-3-sonnet-20240229').")
     # Add other Anthropic client params like base_url, timeout if needed
@@ -111,35 +112,19 @@ class AnthropicProvider(BaseProvider):
 
         return system_prompt_content, messages
 
-    def _format_tools_for_anthropic(self, tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
-         """Converts OpenAI-style tool list to Anthropic's tool format."""
-         if not tools:
-             return None
-         anthropic_tools = []
-         for tool_dict in tools:
-             if tool_dict.get("type") == "function":
-                 func_spec = tool_dict.get("function")
-                 if func_spec:
-                     anthropic_tools.append({
-                         "name": func_spec.get("name"),
-                         "description": func_spec.get("description"),
-                         "input_schema": func_spec.get("parameters") # Anthropic uses 'input_schema'
-                     })
-         return anthropic_tools if anthropic_tools else None
-
+    # Removed _format_tools_for_anthropic method
 
     def generate_response(
         self,
         prompt: List[Dict[str, str]],
         output_schema: Type[BaseOutputSchema],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[str] = None, # Anthropic might handle this differently
+        # Removed tools and tool_choice parameters
         **kwargs
-    ) -> Union[BaseOutputSchema, Any]:
-        """Generates a response from the Anthropic LLM using the patched client."""
+    ) -> BaseOutputSchema: # Return type is now always the validated schema
+        """Generates a response from the Anthropic LLM, enforcing the output schema."""
         try:
             system_prompt, messages = self._format_prompt_for_anthropic(prompt)
-            anthropic_tools = self._format_tools_for_anthropic(tools)
+            # Removed call to _format_tools_for_anthropic
 
             # Prepare API call arguments
             api_kwargs = {
@@ -151,20 +136,16 @@ class AnthropicProvider(BaseProvider):
             }
             if system_prompt:
                 api_kwargs["system"] = system_prompt
-            if anthropic_tools:
-                 api_kwargs["tools"] = anthropic_tools
-                 # TODO: Handle Anthropic's tool_choice mechanism if needed.
-                 # It might involve specific structures or be handled by instructor.
-                 # if tool_choice == "none": ... etc.
+            # Removed logic adding tools to api_kwargs
 
             # Use instructor-patched client
-            # Instructor handles response_model validation or tool call detection
+            # Instructor handles response_model validation
             response = self.client.messages.create(
-                 response_model=output_schema,
+                 response_model=output_schema, # Always enforce the output schema
                  **api_kwargs
             )
 
-            # Instructor should return validated schema or raw response with tool calls
+            # Instructor should return the validated schema instance
             return response
 
         except ValidationError as e:

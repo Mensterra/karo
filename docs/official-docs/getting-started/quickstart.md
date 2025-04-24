@@ -121,41 +121,86 @@ if isinstance(result, BaseOutputSchema) and memory_manager:
 
 Now, when you run the agent multiple times, it will retrieve relevant past interactions (stored as summaries) and use them as context.
 
-## 4. Using Tools
+## 4. Using Tools (Refactored Approach)
 
-To enable tools:
+Tool usage now involves external orchestration based on the agent's output.
 
 ```python
 # (Add these imports)
-from karo.tools.calculator_tool import CalculatorTool
-# from your_custom_tool_module import YourCustomTool # If you create one
+from karo.tools.calculator_tool import CalculatorTool, CalculatorInput
+from typing import Union, Optional # For the orchestration schema
+from karo.schemas.base_schemas import BaseOutputSchema # For the orchestration schema
+from pydantic import Field # For the orchestration schema
+
+# Define an output schema for the agent to indicate tool use
+class OrchestrationOutputSchema(BaseOutputSchema):
+    tool_name: Optional[str] = Field(None, description="The name of the tool to execute (e.g., 'calculator').")
+    tool_parameters: Optional[Union[CalculatorInput]] = Field(None, description="The input parameters for the selected tool.")
+    direct_response: Optional[str] = Field(None, description="Direct response if no tool needed.")
+    # Add validation logic if needed
 
 # --- Configuration ---
 # ... (Provider and Memory setup as before) ...
 
 # 2c. Initialize Tools
 calculator = CalculatorTool()
-# my_custom_tool = YourCustomTool()
-available_tools = [calculator] # Add any other tools here
+available_tools = {calculator.get_name(): calculator} # Store in a dict
 print("Tools Initialized.")
 
-# 2d. Configure the Agent WITH Tools (and Memory)
+# 2d. Configure the Agent for Orchestration
 agent_config = BaseAgentConfig(
     provider=openai_provider,
     memory_manager=memory_manager,
-    tools=available_tools # Pass the list of tool instances
-    # Adjust system prompt to mention tools
+    output_schema=OrchestrationOutputSchema, # Set the orchestration schema
+    # Adjust system prompt to instruct agent on using the OrchestrationOutputSchema format
+    # e.g., "If you need to calculate, respond with tool_name='calculator' and the required tool_parameters..."
 )
 my_agent = BaseAgent(config=agent_config)
-print("Agent Initialized with Memory and Tools.")
+# Update system prompt if not done via builder in config
+# my_agent.prompt_builder.role_description = "..."
+print("Agent Initialized for Orchestration.")
 
 # --- Interaction ---
-# ... (Prepare input) ...
 user_message = "What is 75 divided by 3?"
-input_data = BaseInputSchema(chat_message=user_message)
+input_data = BaseInputSchema(chat_message=user_message) # Agent's input schema
 
-# ... (Run agent and process output as before) ...
-# The agent should now use the calculator tool automatically if needed.
+print(f"\nSending message: '{user_message}'")
+agent_output = my_agent.run(input_data)
+
+# 5. Process Output and Execute Tool Externally
+if isinstance(agent_output, OrchestrationOutputSchema):
+    if agent_output.tool_name and agent_output.tool_parameters:
+        tool_to_run = available_tools.get(agent_output.tool_name)
+        if tool_to_run and agent_output.tool_name == "calculator":
+            print(f"Agent requested tool: {agent_output.tool_name}")
+            try:
+                # Ensure parameters are correct type (should be handled by Pydantic/Instructor)
+                if isinstance(agent_output.tool_parameters, CalculatorInput):
+                    tool_result = tool_to_run.run(agent_output.tool_parameters)
+                    print(f"Tool Result ({agent_output.tool_name}): {tool_result}")
+                    # You might want to display tool_result.result specifically
+                    if tool_result.success:
+                         print(f"Calculation Result: {tool_result.result}")
+                    else:
+                         print(f"Calculation Error: {tool_result.error_message}")
+                else:
+                    print("Error: Agent provided incorrect parameter type for calculator.")
+            except Exception as e:
+                print(f"Error running tool {agent_output.tool_name}: {e}")
+        elif tool_to_run:
+             print(f"Error: Handling for tool '{agent_output.tool_name}' not implemented in this example.")
+        else:
+            print(f"Error: Agent requested unknown tool '{agent_output.tool_name}'")
+    elif agent_output.direct_response:
+        print(f"\nAgent Response: {agent_output.direct_response}")
+    else:
+        print("\nAgent returned no specific action.")
+
+elif isinstance(agent_output, AgentErrorSchema):
+    print(f"\nAgent Error: {agent_output.error_type} - {agent_output.error_message}")
+else:
+    print(f"\nUnexpected result type: {type(agent_output)}")
+
 ```
 
 ## Next Steps

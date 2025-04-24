@@ -1,5 +1,4 @@
 import os
-import instructor
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -10,7 +9,7 @@ load_dotenv()
 # Import Karo components
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
+from karo.schemas.base_schemas import AgentErrorSchema
 
 # Initialize console for rich output
 console = Console()

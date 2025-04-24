@@ -1,12 +1,10 @@
 import pytest
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, MagicMock
 import os
-import json
 
 # Import necessary components
 from karo.providers.anthropic_provider import AnthropicProvider, AnthropicProviderConfig
 from karo.schemas.base_schemas import BaseOutputSchema
-from pydantic import SecretStr, BaseModel
 
 # Define a simple output schema for testing
 class SimpleOutput(BaseOutputSchema):

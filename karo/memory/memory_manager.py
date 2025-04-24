@@ -2,30 +2,45 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid # Import uuid module
+from karo.memory.memory_models import MemoryQueryResult, MemoryRecord
+from karo.memory.services.chromadb_service import ChromaDBConfig, ChromaDBService
+from pydantic import BaseModel, Field # Import BaseModel and Field
 
-from karo.memory.services.chromadb_service import ChromaDBService
-from karo.memory.memory_models import MemoryRecord, MemoryQueryResult
 
 logger = logging.getLogger(__name__)
 
+# --- Configuration Model ---
+class MemoryManagerConfig(BaseModel):
+    """Configuration for MemoryManager."""
+    # Currently only supports ChromaDB, add type discriminator if more are added
+    db_type: str = Field("chromadb", description="Type of database service to use.")
+    chromadb_config: ChromaDBConfig = Field(..., description="Configuration for ChromaDBService.")
+    # Add other DB type configs here using Union if needed later
+
+# --- Memory Manager Class ---
 class MemoryManager:
     """
     Manages the agent's persistent memory operations.
     Acts as an interface to the underlying memory storage and retrieval service (e.g., ChromaDBService).
     Future versions might include logic for deciding what/when to store/retrieve.
     """
+    db_service: ChromaDBService # Type hint for the instantiated service
 
-    def __init__(self, chroma_service: ChromaDBService):
+    def __init__(self, config: MemoryManagerConfig):
         """
-        Initializes the MemoryManager.
+        Initializes the MemoryManager based on configuration.
 
         Args:
-            chroma_service: An initialized instance of ChromaDBService.
+            config: An instance of MemoryManagerConfig.
         """
-        if not isinstance(chroma_service, ChromaDBService):
-            raise TypeError("chroma_service must be an instance of ChromaDBService")
-        self.chroma_service = chroma_service
-        logger.info("MemoryManager initialized.")
+        self.config = config
+        if config.db_type.lower() == "chromadb":
+            # Instantiate the service based on the config object
+            self.db_service = ChromaDBService(config=config.chromadb_config)
+            logger.info(f"MemoryManager initialized with ChromaDBService (Path: {config.chromadb_config.path}, Collection: {config.chromadb_config.collection_name}).")
+        else:
+            # Handle other potential db_types here
+            raise ValueError(f"Unsupported db_type in MemoryManagerConfig: {config.db_type}")
 
     def add_memory(
         self,
@@ -59,7 +74,7 @@ class MemoryManager:
                  metadata_to_store['importance_score'] = importance_score
 
             # 4. Call the service method directly
-            self.chroma_service.add_memory(
+            self.db_service.add_memory(
                 id=mem_id,
                 text=text,
                 metadata=metadata_to_store
@@ -88,7 +103,7 @@ class MemoryManager:
             A list of MemoryQueryResult objects, sorted by relevance.
         """
         try:
-            raw_results = self.chroma_service.query_memories(
+            raw_results = self.db_service.query_memories(
                 query_text=query_text,
                 n_results=n_results,
                 where=where_filter
@@ -126,7 +141,7 @@ class MemoryManager:
         """Gets a specific memory by its ID."""
         try:
             # Try getting the raw result from the service
-            raw_result = self.chroma_service.get_memory_by_id(memory_id)
+            raw_result = self.db_service.get_memory_by_id(memory_id)
         except Exception as service_err:
             # Handle errors during the service call
             logger.error(f"MemoryManager failed to get memory by ID ({memory_id}) from service: {service_err}", exc_info=True)
@@ -156,7 +171,7 @@ class MemoryManager:
 
     def delete_memory(self, memory_id: str):
         """Deletes a memory by its ID."""
-        self.chroma_service.delete_memory(memory_id)
+        self.db_service.delete_memory(memory_id)
         logger.info(f"MemoryManager deleted memory with ID: {memory_id}")
 
 
@@ -170,12 +185,13 @@ if __name__ == "__main__":
     load_dotenv(dotenv_path=dotenv_path)
 
     # Basic configuration for ChromaDBService
-    from karo.memory.services.chromadb_service import ChromaDBConfig
     chroma_config = ChromaDBConfig() # Uses defaults
 
     try:
-        service = ChromaDBService(config=chroma_config)
-        manager = MemoryManager(chroma_service=service)
+        # Create MemoryManager config
+        mem_config = MemoryManagerConfig(chromadb_config=chroma_config)
+        # Instantiate manager using the config
+        manager = MemoryManager(config=mem_config)
 
         # --- Test Adding Memory ---
         print("\n--- Testing Add Memory ---")

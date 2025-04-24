@@ -1,0 +1,26 @@
+[
+  {
+    "question": "How long does shipping usually take?",
+    "answer": "Standard shipping typically takes 3-5 business days within the continental US. International shipping times vary."
+  },
+  {
+    "question": "What is your return policy?",
+    "answer": "You can return most items within 30 days of delivery for a full refund. Items must be in original condition. Please visit our website's return section for full details and to initiate a return."
+  },
+  {
+    "question": "Can I change my shipping address after placing an order?",
+    "answer": "If your order has not yet shipped, you may be able to update the shipping address by contacting customer support immediately. Once an order has shipped, the address cannot be changed."
+  },
+  {
+    "question": "How do I track my order?",
+    "answer": "Once your order ships, you will receive an email with tracking information. You can use the tracking number on the carrier's website to follow your package."
+  },
+  {
+    "question": "What payment methods do you accept?",
+    "answer": "We accept major credit cards (Visa, MasterCard, American Express), PayPal, and Apple Pay."
+  },
+  {
+    "question": "Do you ship internationally?",
+    "answer": "Yes, we ship to many countries worldwide. Shipping costs and times vary by destination. Please check our shipping policy page for more details."
+  }
+]

@@ -1,8 +1,6 @@
 import pytest
-from unittest.mock import MagicMock, patch, ANY, call # Added ANY
+from unittest.mock import MagicMock, patch, ANY
 import os
-from pydantic import SecretStr
-from datetime import datetime, timezone # Added datetime imports
 
 # Modules to test
 from karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig

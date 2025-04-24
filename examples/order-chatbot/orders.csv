@@ -1,0 +1,6 @@
+OrderNumber,CustomerEmail,Status,Item,ShippingAddress
+ORD1001,alice@example.com,Shipped,Laptop,"123 Main St, Anytown, USA"
+ORD1002,bob@example.com,Processing,Keyboard,"456 Oak Ave, Somewhere, USA"
+ORD1003,alice@example.com,Delivered,Monitor,"123 Main St, Anytown, USA"
+ORD1004,charlie@example.com,Shipped,Mouse,"789 Pine Ln, Elsewhere, USA"
+ORD1005,bob@example.com,Cancelled,Webcam,"456 Oak Ave, Somewhere, USA"

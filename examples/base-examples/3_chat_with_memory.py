@@ -1,9 +1,7 @@
 import os
-import instructor
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()

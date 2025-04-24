@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import patch
-import os
 from pydantic import ValidationError
 from pathlib import Path
 

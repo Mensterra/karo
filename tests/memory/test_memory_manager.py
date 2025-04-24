@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 from datetime import datetime, timezone # Added timezone
-import uuid
 
 # Modules to test
 from karo.memory.memory_manager import MemoryManager

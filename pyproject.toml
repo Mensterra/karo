@@ -1,6 +1,6 @@
 [project]
 name = "karo"
-version = "0.2.0"
+version = "0.3.0"
 description = "Modular Python framework for building AI agents with persistent memory"
 authors = [
     {name = "Mensterra",email = "support@mensterra.com"}
@@ -18,8 +18,9 @@ dependencies = [
     "pypdf>=4.0.0", # For DocumentReaderTool
     "python-docx>=1.0.0", # For DocumentReaderTool
     "anthropic>=0.20.0", # For Anthropic Provider
+    "email-validator (>=2.2.0,<3.0.0)",
 ]
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 
 
 [build-system]
@@ -31,4 +32,20 @@ pytest = "^8.3.5"
 pytest-mock = "^3.14.0"
 python-dotenv = "^1.1.0"
 rich = "^13.7"
+
+[tool.poetry.group.serve.dependencies]
+fastapi = "^0.115.9" # Updated constraint to be compatible with chromadb
+uvicorn = {extras = ["standard"], version = "^0.30.0"}
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+pyyaml = "^6.0.1"
+click = "^8.1.7"
+
+[project.optional-dependencies]
+serve = [
+    "fastapi>=0.115.9",
+    "uvicorn[standard]>=0.30.0",
+    "python-jose[cryptography]>=3.3.0",
+    "pyyaml>=6.0.1",
+    "click>=8.1.7"
+]
 

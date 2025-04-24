@@ -1,8 +1,5 @@
 from typing import Optional, List, Dict, Any
 
-# Import MemoryQueryResult for type hinting
-from karo.memory.memory_models import MemoryQueryResult
-
 class SystemPromptBuilder:
     """
     Builds a structured system prompt for Karo agents by combining

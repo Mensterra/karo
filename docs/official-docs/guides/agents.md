@@ -8,19 +8,13 @@ The primary class you'll typically use or subclass is `karo.core.base_agent.Base
 
 **Key Responsibilities:**
 
-*   Receiving input data (validated against a schema).
+*   Receiving input data (validated against its `input_schema`).
 *   Interacting with a configured LLM **Provider**.
-*   Managing **Tools** available to the agent.
-*   Optionally interacting with a **Memory** system.
-*   Using a **Prompt Builder** to construct dynamic system prompts.
-*   Executing the **ReAct loop**:
-    1.  Call LLM (with tools, memory context).
-    2.  Check if the LLM requested a tool call.
-    3.  If yes: Execute the tool, get the result.
-    4.  Send the tool result back to the LLM.
-    5.  Get the final response.
-    6.  If no tool call initially, return the direct LLM response.
-*   Returning the final output (validated against a schema) or an error schema.
+*   Optionally interacting with a **Memory** system to retrieve context.
+*   Using a **Prompt Builder** to construct dynamic system prompts (including retrieved memory).
+*   Calling the LLM provider to generate a response that conforms to the agent's configured `output_schema`.
+*   Returning the final output (validated `output_schema` instance) or an `AgentErrorSchema`.
+*   **Note:** Tool execution is **not** handled internally by `BaseAgent`. The agent's role is typically to generate structured output (via its `output_schema`) that *indicates* which tool should be called and with what parameters. External application logic is responsible for interpreting this output and executing the corresponding tool.
 
 ## `BaseAgentConfig`
 
@@ -32,10 +26,10 @@ The behavior of a `BaseAgent` instance is determined by its configuration, defin
 *   `input_schema: Type[BaseInputSchema]`: The Pydantic model defining the expected input structure. Defaults to `BaseInputSchema` (which expects a `chat_message: str`). You can subclass `BaseInputSchema` for more complex inputs.
 *   `output_schema: Type[BaseOutputSchema]`: The Pydantic model defining the desired final output structure. Defaults to `BaseOutputSchema` (which expects a `response_message: str`). The agent uses `instructor` (via the provider) to try and force the LLM's final response into this schema.
 *   `prompt_builder: Optional[SystemPromptBuilder]`: An instance of `SystemPromptBuilder` used to construct the system prompt dynamically. If `None`, a default builder with a basic role description is used. See the [Prompts Guide](./prompts.md) for details.
-*   `memory_manager: Optional[MemoryManager]`: An instance of `MemoryManager` if the agent needs to access persistent memory (e.g., for RAG from a knowledge base). See the [Memory Guide](./memory.md) *(Coming Soon)*.
+*   `memory_manager: Optional[MemoryManager]`: An instance of `MemoryManager` if the agent needs to access **long-term persistent memory** (e.g., for RAG from a knowledge base). See the [Memory Guide](./memory.md) *(Coming Soon)*.
 *   `memory_query_results: int`: If `memory_manager` is used, this specifies how many relevant memory chunks to retrieve per query (default: 3).
-*   `tools: Optional[List[BaseTool]]`: A list of tool instances (e.g., `[CalculatorTool(), OrderCSVTool()]`) that the agent can use. See the [Tools Guide](./tools.md) *(Coming Soon)*.
-*   `max_tool_iterations: int`: The maximum number of times the agent will loop through the LLM -> Tool -> LLM cycle before giving up and forcing a final response (default: 5). Prevents infinite loops.
+*   `conversation_history: Optional[ConversationHistory]`: An instance of `ConversationHistory` (`karo.memory.conversation_history.ConversationHistory`) used to manage the **short-term turn-by-turn chat history buffer**. If provided, `BaseAgent` will automatically add user/assistant messages and include the history in prompts sent to the LLM.
+*   **Removed:** `tools` and `max_tool_iterations` fields are no longer part of `BaseAgentConfig`. Tool handling is managed externally.
 
 ## Creating an Agent Instance
 
@@ -70,8 +64,9 @@ def create_my_agent():
     agent_config = BaseAgentConfig(
         provider=provider,
         prompt_builder=prompt_builder,
-        # tools=available_tools,
-        # memory_manager=memory_manager
+        # memory_manager=memory_manager,
+        # conversation_history=ConversationHistory(max_messages=10), # Add history buffer
+        output_schema=MyOrchestrationOutputSchema # Example: Set output schema for tool indication
     )
 
     # 6. Create Agent
