@@ -17,13 +17,13 @@ load_dotenv()
 # Import Karo components
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
+from karo.schemas.base_schemas import BaseOutputSchema, AgentErrorSchema
 from karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig
 from karo.memory.memory_manager import MemoryManager
 # Import Tools
-from karo.tools.calculator_tool import CalculatorTool, CalculatorInput, CalculatorOutput
-from karo.memory.tools.memory_store_tool import MemoryStoreTool, MemoryStoreInput, MemoryStoreOutput
-from karo.memory.tools.memory_query_tool import MemoryQueryTool, MemoryQueryInput, MemoryQueryOutput
+from karo.tools.calculator_tool import CalculatorTool, CalculatorInput
+from karo.memory.tools.memory_store_tool import MemoryStoreTool, MemoryStoreInput
+from karo.memory.tools.memory_query_tool import MemoryQueryTool, MemoryQueryInput
 # Import BaseTool for type hinting if needed later
 from karo.tools.base_tool import BaseTool
 
@@ -125,18 +125,14 @@ def main():
     agent_config = BaseAgentConfig(
         provider=provider,
         memory_manager=memory_manager,
-        # Removed 'tools' parameter
         output_schema=OrchestrationOutputSchema, # Set the new output schema
         prompt_builder=None, # Let BaseAgent create default, pass system_prompt below? No, prompt_builder handles it.
-        # Let's create a builder and pass the prompt
-        # prompt_builder=SystemPromptBuilder(role_description=system_prompt), # This might not be right way
         memory_query_results=3 # Keep memory retrieval
     )
     # Let's manually set the system prompt in the builder after agent init for clarity
     agent = BaseAgent(config=agent_config)
     agent.prompt_builder.role_description = system_prompt # Override default role description
     console.print("[green]✓ Base Agent (Orchestrator) Initialized[/green]")
-    # Removed print of agent.llm_tools as it no longer exists
 
     # 6. Interaction Loop with External Tool Orchestration
     console.print("\nEnter your message below (e.g., 'What is 12 * 5?', 'Remember my favorite color is blue', 'What is my favorite color?'):")

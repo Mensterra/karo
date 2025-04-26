@@ -3,9 +3,16 @@ from chromadb.config import Settings
 from chromadb.api.models.Collection import Collection
 from chromadb.utils import embedding_functions
 from pydantic import BaseModel, Field, SecretStr
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Protocol
 import os
 import logging
+
+class EmbeddingFunction(Protocol):
+    """
+    A generic interface for embedding functions.
+    """
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        ...
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,8 +27,8 @@ class ChromaDBConfig(BaseModel):
     collection_name: str = Field("karo_memory", description="Default collection name for memories.")
     embedding_model_name: str = Field("text-embedding-3-small", description="Name of the OpenAI embedding model.")
     openai_api_key: Optional[SecretStr] = Field(None, description="OpenAI API key for embeddings. Uses OPENAI_API_KEY env var if None.")
+    embedding_function: Optional[EmbeddingFunction] = Field(None, description="A custom embedding function to use.")
     # Add other Chroma settings if needed (e.g., tenant, database)
-
     class Config:
         arbitrary_types_allowed = True
 
@@ -74,8 +81,15 @@ class ChromaDBService:
             raise ConnectionError(f"Could not connect to ChromaDB: {e}") from e
 
     def _initialize_embedding_function(self):
-        """Initializes the OpenAI embedding function."""
+        """Initializes the embedding function."""
         if self._ef:
+            return
+
+        if self.config.embedding_function:
+            self._ef = self.config.embedding_function
+            logger.info("Using provided embedding function.")
+            if self.config.openai_api_key or self.config.embedding_model_name:
+                logger.warning("Both embedding_function and openai_api_key/embedding_model_name are provided. Using embedding_function.")
             return
 
         api_key = self.config.openai_api_key.get_secret_value() if self.config.openai_api_key else os.getenv("OPENAI_API_KEY")
@@ -90,7 +104,7 @@ class ChromaDBService:
             logger.info(f"OpenAI embedding function initialized with model: {self.config.embedding_model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI embedding function: {e}", exc_info=True)
-            raise ValueError(f"Could not initialize OpenAI embedding function: {e}") from e
+            raise ValueError(f"Could not initialize OpenAI embedding function: {e}. Ensure OPENAI_API_KEY is set correctly.") from e
 
     def _get_or_create_collection(self) -> Collection:
         """Gets or creates the ChromaDB collection."""

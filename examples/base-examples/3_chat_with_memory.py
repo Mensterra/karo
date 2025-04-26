@@ -9,7 +9,7 @@ load_dotenv()
 # Import Karo components
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
+from karo.schemas.base_schemas import AgentErrorSchema
 from karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig
 from karo.memory.memory_manager import MemoryManager
 

@@ -7,6 +7,8 @@ from typing import List
 from rich.panel import Panel
 import logging
 
+
+
 # Configure basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,8 +21,7 @@ load_dotenv(dotenv_path=dotenv_path)
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
 from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema
-# Import the custom tool using relative import
-from .excel_reader_tool import ExcelReaderTool, ExcelReaderInput, ExcelReaderOutput
+from karo.tools.excel_reader_tool import ExcelReaderTool, ExcelReaderInput
 
 # Initialize console for rich output
 console = Console()

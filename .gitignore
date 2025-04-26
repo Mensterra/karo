@@ -133,3 +133,6 @@ dmypy.json
 cython_debug/
 
 .karo_chroma_db/
+examples/order-chatbot/.karo_orderbot_db/
+karo/.karo_chroma_db/*
+embedding_model_refactor_plan.md

@@ -1,3 +1,5 @@
 exclude karo/.karo_chroma_db/*
+exclude examples/order-chatbot/.karo_orderbot_db
 global-exclude __pycache__
 global-exclude *.pyc
+

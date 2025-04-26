@@ -5,7 +5,8 @@ from pydantic import SecretStr
 # Import Karo components
 from karo.core.base_agent import BaseAgent, BaseAgentConfig
 from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-from karo.providers.anthropic_provider import AnthropicProvider, AnthropicProviderConfig # Import Anthropic
+from karo.providers.anthropic_provider import AnthropicProvider, AnthropicProviderConfig  # Import Anthropic
+from karo.providers.ollama_provider import OllamaProvider, OllamaProviderConfig
 from karo.prompts.system_prompt_builder import SystemPromptBuilder
 from karo.schemas.base_schemas import BaseInputSchema
 
@@ -13,7 +14,7 @@ from karo.schemas.base_schemas import BaseInputSchema
 load_dotenv()
 
 # --- Configuration ---
-# Ensure you have OPENAI_API_KEY, ANTHROPIC_API_KEY, and GOOGLE_API_KEY (for Gemini) in your .env file
+# Ensure you have OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY (for Gemini), and OLLAMA_BASE_URL in your .env file
 
 # 1. OpenAI Configuration
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -21,7 +22,7 @@ if not openai_api_key:
     print("Warning: OPENAI_API_KEY not found in environment variables.")
 openai_config = OpenAIProviderConfig(
     model="gpt-4o-mini",
-    api_key=SecretStr(openai_api_key) if openai_api_key else None
+    api_key=SecretStr(openai_api_key) if openai_api_key else None,
 )
 
 # 2. Anthropic Configuration
@@ -29,18 +30,27 @@ anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 if not anthropic_api_key:
     print("Warning: ANTHROPIC_API_KEY not found in environment variables.")
 anthropic_config = AnthropicProviderConfig(
-    model="claude-3-haiku-20240307", # Use a cost-effective model
-    api_key=SecretStr(anthropic_api_key) if anthropic_api_key else None
+    model="claude-3-haiku-20240307",  # Use a cost-effective model
+    api_key=SecretStr(anthropic_api_key) if anthropic_api_key else None,
 )
 
 # 3. Gemini Configuration (using OpenAIProvider with compatibility endpoint)
-gemini_api_key = os.getenv("GOOGLE_API_KEY") # Google uses GOOGLE_API_KEY
+gemini_api_key = os.getenv("GOOGLE_API_KEY")  # Google uses GOOGLE_API_KEY
 if not gemini_api_key:
     print("Warning: GOOGLE_API_KEY not found in environment variables (needed for Gemini).")
 gemini_config = OpenAIProviderConfig(
-    model="gemini-1.5-flash-latest", # Or other compatible Gemini model
+    model="gemini-1.5-flash-latest",  # Or other compatible Gemini model
     api_key=SecretStr(gemini_api_key) if gemini_api_key else None,
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/" # Gemini's OpenAI-compatible endpoint
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",  # Gemini's OpenAI-compatible endpoint
+)
+
+# 4. Ollama Configuration
+ollama_base_url = os.getenv("OLLAMA_BASE_URL")
+if not ollama_base_url:
+    print("Warning: OLLAMA_BASE_URL not found in environment variables. Using default http://localhost:11434")
+ollama_config = OllamaProviderConfig(
+    model="llama2",
+    base_url=ollama_base_url if ollama_base_url else "http://localhost:11434",
 )
 
 # --- Provider Initialization ---
@@ -73,6 +83,13 @@ try:
 except Exception as e:
     print(f"Error initializing Gemini Provider (via OpenAI compatibility): {e}")
 
+try:
+    # Initialize Ollama provider
+    providers["ollama"] = OllamaProvider(config=ollama_config)
+    print(f"Initialized Ollama Provider with model: {providers['ollama'].get_model_name()}")
+except Exception as e:
+    print(f"Error initializing Ollama Provider: {e}")
+
 
 # --- Agent Setup & Testing Loop ---
 print("\n--- Testing Initialized Providers ---")
@@ -82,16 +99,18 @@ for provider_key, selected_provider in providers.items():
 
     # Basic Prompt Builder
     prompt_builder = SystemPromptBuilder(
-        role_description=f"You are a helpful assistant running on the {provider_key} provider.", # Use the loop variable 'provider_key'
-        core_instructions="Answer concisely."
+        role_description=f"You are a helpful assistant running on the {provider_key} provider.",  # Use the loop variable 'provider_key'
+        core_instructions="Answer concisely.",
     )
 
     # Agent Config
     agent_config = BaseAgentConfig(
-        provider=selected_provider,
-        prompt_builder=prompt_builder
+        provider_config=selected_provider.config,
+        prompt_builder_config={
+            "role_description": f"You are a helpful assistant running on the {provider_key} provider.",
+            "core_instructions": "Answer concisely.",
+        },
     )
-
     # Create Agent
     agent = BaseAgent(config=agent_config)
 
@@ -102,12 +121,12 @@ for provider_key, selected_provider in providers.items():
 
     try:
         result = agent.run(input_data)
-        if hasattr(result, 'response_message'):
-            print(f"Agent ({provider_key}): {result.response_message}") # Use loop variable
+        if hasattr(result, "response_message"):
+            print(f"Agent ({provider_key}): {result.response_message}")  # Use loop variable
         else:
-            print(f"Agent ({provider_key}) Raw Output: {result}") # Use loop variable
+            print(f"Agent ({provider_key}) Raw Output: {result}")  # Use loop variable
     except Exception as e:
-        print(f"Agent ({provider_key}) Error: {e}") # Use loop variable
+        print(f"Agent ({provider_key}) Error: {e}")  # Use loop variable
 
 # End of loop
 if not providers:

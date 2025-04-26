@@ -42,7 +42,7 @@ class ExcelReaderTool(BaseTool):
     def __init__(self, config: Optional[Any] = None):
         """Initialize the ExcelReaderTool."""
         logger.info("ExcelReaderTool initialized.")
-        pass # No specific config needed
+        pass  # No specific config needed
 
     def run(self, input_data: ExcelReaderInput) -> ExcelReaderOutput:
         """
@@ -64,18 +64,18 @@ class ExcelReaderTool(BaseTool):
         if not isinstance(input_data, self.input_schema):
             return self.output_schema(success=False, error_message="Invalid input data format.", file_path=str(input_data.file_path), sheet_name_read="N/A")
 
-        file_path_str = str(input_data.file_path) # Pydantic v2 returns Path object
+        file_path_str = str(input_data.file_path)  # Pydantic v2 returns Path object
 
         # Basic check for file existence before trying pandas
         if not os.path.exists(file_path_str):
-             return self.output_schema(success=False, error_message=f"File not found at path: {file_path_str}", file_path=file_path_str, sheet_name_read="N/A")
+            return self.output_schema(success=False, error_message=f"File not found at path: {file_path_str}", file_path=file_path_str, sheet_name_read="N/A")
 
         try:
             # Determine sheet to read
-            excel_file = pd.ExcelFile(file_path_str, engine='openpyxl') # Specify engine
+            excel_file = pd.ExcelFile(file_path_str, engine='openpyxl')  # Specify engine
             sheet_names = excel_file.sheet_names
-            sheet_to_read: Union[str, int] = 0 # Default to first sheet index
-            sheet_name_read: str = sheet_names[0] # Default name
+            sheet_to_read: Union[str, int] = 0  # Default to first sheet index
+            sheet_name_read: str = sheet_names[0]  # Default name
 
             if input_data.sheet_name is not None:
                 if isinstance(input_data.sheet_name, int):
@@ -93,7 +93,7 @@ class ExcelReaderTool(BaseTool):
 
             # Read the sheet with row/col limits
             # Read only necessary rows initially to check columns
-            header_df = pd.read_excel(excel_file, sheet_name=sheet_to_read, nrows=0) # Read only header
+            header_df = pd.read_excel(excel_file, sheet_name=sheet_to_read, nrows=0)  # Read only header
             all_columns = header_df.columns.tolist()
             cols_to_use = all_columns[:input_data.max_cols] if input_data.max_cols else all_columns
 
@@ -106,7 +106,7 @@ class ExcelReaderTool(BaseTool):
 
             # Generate preview (e.g., markdown table)
             # Limit preview rows further if needed
-            preview_rows = min(len(df), 10) # Show max 10 rows in preview
+            preview_rows = min(len(df), 10)  # Show max 10 rows in preview
             data_preview_str = df.head(preview_rows).to_markdown(index=False)
 
             logger.info(f"Successfully read {len(df)} rows and {len(df.columns)} columns from sheet '{sheet_name_read}' in '{file_path_str}'.")
@@ -121,8 +121,8 @@ class ExcelReaderTool(BaseTool):
             )
 
         except FileNotFoundError:
-             # This case should be caught by os.path.exists, but included for robustness
-             return self.output_schema(success=False, error_message=f"File not found at path: {file_path_str}", file_path=file_path_str, sheet_name_read="N/A")
+            # This case should be caught by os.path.exists, but included for robustness
+            return self.output_schema(success=False, error_message=f"File not found at path: {file_path_str}", file_path=file_path_str, sheet_name_read="N/A")
         # Remove the redundant ImportError handler here as it's checked above
         # except ImportError:
         #      logger.error("Missing dependency: 'openpyxl' is required to read .xlsx files. Install with `poetry add openpyxl` or `pip install openpyxl`.")
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         assert output4.success
         assert output4.row_count == 3
         assert output4.column_names == ['col A', 'col B']
-        assert "cherry" not in output4.data_preview # Row 3 (index 2) should be last
+        assert "cherry" not in output4.data_preview  # Row 3 (index 2) should be last
 
     except Exception as e:
         print(f"Error during example execution: {e}")

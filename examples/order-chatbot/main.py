@@ -9,15 +9,14 @@ from pydantic import Field
 
 # Import Karo components using relative paths
 try:
-    from ...karo.core.base_agent import BaseAgent, BaseAgentConfig
-    from ...karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
-    from ...karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema # Base for custom schema
-    from ...karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig
-    from ...karo.memory.memory_manager import MemoryManager # Long-term memory
-    from ...karo.memory.conversation_history import ConversationHistory # Short-term history
-    from ...karo.prompts.system_prompt_builder import SystemPromptBuilder
-    # Import the custom tool and its input schema (relative within example)
-    from .csv_order_reader_tool import CsvOrderReaderTool, CsvOrderReaderInput
+    from karo.core.base_agent import BaseAgent, BaseAgentConfig
+    from karo.providers.openai_provider import OpenAIProvider, OpenAIProviderConfig
+    from karo.schemas.base_schemas import BaseInputSchema, BaseOutputSchema, AgentErrorSchema # Base for custom schema
+    from karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig
+    from karo.memory.memory_manager import MemoryManager # Long-term memory
+    from karo.prompts.system_prompt_builder import SystemPromptBuilder
+    from karo.tools.csv_reader_tool import CsvReaderInput, CsvReaderTool
+
 except ImportError as e:
     raise ImportError(f"Ensure Karo framework components are accessible relative to main.py: {e}")
 
@@ -39,7 +38,7 @@ class OrderBotOutputSchema(BaseOutputSchema):
     """
     action: str = Field(..., description="The required action: 'ANSWER', 'REQUEST_INFO', 'LOOKUP_ORDER'.")
     response_text: Optional[str] = Field(None, description="The direct text response to the user (used for ANSWER or REQUEST_INFO).")
-    tool_parameters: Optional[CsvOrderReaderInput] = Field(None, description="Parameters if action is 'LOOKUP_ORDER'.")
+    tool_parameters: Optional[CsvReaderInput] = Field(None, description="Parameters if action is 'LOOKUP_ORDER'.")
 
     @classmethod
     def model_validator(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -99,7 +98,7 @@ def main():
         load_faq_data(memory_manager, FAQ_JSON_PATH) # Load FAQs
 
         # Tool
-        order_reader_tool = CsvOrderReaderTool()
+        order_reader_tool = CsvReaderTool()
         available_tools = {order_reader_tool.get_name(): order_reader_tool}
         console.print(f"[green]✓ Tools Initialized: {', '.join(available_tools.keys())}[/green]")
 
