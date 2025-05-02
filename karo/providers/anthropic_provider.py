@@ -7,8 +7,10 @@ from anthropic import APIError, RateLimitError
 from karo.providers.base_provider import BaseProvider
 from karo.schemas.base_schemas import BaseOutputSchema
 from pydantic import BaseModel, Field, SecretStr, ValidationError
-from typing import Any, Type, List, Dict, Optional
+from typing import Any, Type, List, Dict, Optional, Union
+import os
 import logging
+import json # For tool result content
 
 logger = logging.getLogger(__name__)
 
@@ -65,54 +67,49 @@ class AnthropicProvider(BaseProvider):
         system_prompt_content: Optional[str] = None
         messages: List[MessageParam] = []
 
-        for i, message in enumerate(prompt):
+        # First, extract the system message if present
+        for message in prompt:
+            if message.get("role") == "system":
+                system_prompt_content = message.get("content", "")
+                break
+        
+        # Process all non-system messages
+        for message in prompt:
             role = message.get("role")
-            content = message.get("content")
-            tool_calls = message.get("tool_calls") # OpenAI format
-            tool_call_id = message.get("tool_call_id") # Tool result ID
-            tool_name = message.get("name") # Tool result name
-
+            content = message.get("content", "")
+            
             if role == "system":
-                # Anthropic takes system prompt as a separate top-level parameter
-                system_prompt_content = content
+                # Already handled above
+                continue
             elif role == "user":
-                messages.append({"role": "user", "content": content or ""})
+                messages.append({"role": "user", "content": content})
             elif role == "assistant":
-                # Anthropic expects assistant messages to potentially contain tool_calls directly
-                # Instructor might handle the conversion from OpenAI format to Anthropic's tool_use format.
-                # Let's assume instructor does this when patching `messages.create`.
-                # If not, manual conversion would be needed here.
-                # For now, pass content and let instructor handle potential tool_calls structure.
-                 assistant_parts = []
-                 if content:
-                     assistant_parts.append({"type": "text", "text": content})
-                 # TODO: Verify if instructor needs manual conversion of OpenAI tool_calls to Anthropic tool_use blocks
-                 # if tool_calls:
-                 #    for tc in tool_calls:
-                 #        assistant_parts.append({"type": "tool_use", "id": tc['id'], "name": tc['function']['name'], "input": json.loads(tc['function']['arguments'])})
-                 if assistant_parts: # Only add if there's content
+                assistant_parts = []
+                if content:
+                    assistant_parts.append({"type": "text", "text": content})
+                if assistant_parts:
                     messages.append({"role": "assistant", "content": assistant_parts})
-
             elif role == "tool":
-                # Anthropic expects tool results in a specific format
-                # Content needs to be the result from the tool run
-                messages.append({
-                    "role": "user", # Tool results are passed within a 'user' role message for Anthropic
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_call_id,
-                            "content": content, # Pass the JSON string output from the tool directly
-                            # "is_error": True, # Optionally indicate errors
-                        }
-                    ]
-                })
-            else:
-                 logger.warning(f"Unsupported role '{role}' in prompt for Anthropic, skipping.")
-
+                tool_call_id = message.get("tool_call_id")
+                if tool_call_id and content:
+                    messages.append({
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_call_id,
+                                "content": content
+                            }
+                        ]
+                    })
+        
+        # Ensure we have at least one message for Anthropic API
+        if not messages:
+            # Add a default user message if no messages were processed
+            messages.append({"role": "user", "content": "Hello"})
+            logger.warning("No valid messages found in prompt. Adding a default user message.")
+        
         return system_prompt_content, messages
-
-    # Removed _format_tools_for_anthropic method
 
     def generate_response(
         self,

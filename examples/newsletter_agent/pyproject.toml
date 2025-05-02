@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "karo-exa-search-tool"
+version = "0.4.0"
+description = "A Karo Agent Framework tool for searching the web and retrieving content using the Exa API."
+authors = ["Mensterra <support@mensterra.com>"]
+readme = "README.md"
+license = "Apache-2.0" # Inherited from main project
+packages = [{ include = "karo", from = "../.."}] # Include karo from parent
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0" # Specify compatible Python versions
+karo = {path = "../../", develop = true}
+exa-py = ">=1.0.6" # Check for the latest stable version
+
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"] # Specify poetry-core requirement
+build-backend = "poetry.core.masonry.api"

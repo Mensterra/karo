@@ -31,6 +31,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Session Management (In-Memory):**
     - Added `karo/karo/sessions/` module with `KaroSession`, `KaroEvent` models and `BaseSessionService`, `InMemorySessionService`.
     - Added `/karo/docs/official-docs/guides/sessions.md` documentation.
+- **Database Integration:**
+    - Added database support for persistent storage of session data, user information, and analytics.
+    - Implemented database migrations and ORM integration for PostgreSQL.
+    - Added configuration options for database connection in the settings.
+- **Improved Excel Summarizer Example:**
+    - Fixed hallucination issues in the `excel_summarizer` example by properly managing prompt and message history.
+    - Added support for both OpenAI and Anthropic providers in the example.
+    - Created a Streamlit-based web interface for the Excel summarizer demo.
+    - Added detailed debugging options to visualize prompt construction and LLM interactions.
 
 ### Changed
 - **BREAKING (Session Management Integration):**
@@ -41,12 +50,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - Removed internal tool execution logic from `karo/karo/core/base_agent.py`.
     - Removed `tools` and `max_tool_iterations` from `BaseAgentConfig`.
     - `BaseAgent.run` now relies on the agent's `output_schema` to indicate tool use for external orchestration.
-- Updated `karo/karo/providers/` (OpenAI, Anthropic) to remove unused tool parameters.
-- Refactored `karo/examples/base-examples/4_agent_with_tools.py` to use external tool orchestration.
-- Refactored `karo/examples/order-chatbot/main.py` to use internal `ConversationHistory`.
-- Updated documentation files within `karo/docs/` (deployment, logging, agents, tools, quickstart, core concepts) to reflect refactored tool handling, new features (history, logging, deployment server), and Dockerization.
-- Changed imports in core modules (`base_agent.py`, `memory_manager.py`, `serving/config.py`) and examples (`csv_order_reader_tool.py`, `order-chatbot/main.py`) to use consistent absolute paths (`karo.karo...`) to resolve Pydantic validation issues.
-- Updated default paths in `karo/examples/order-chatbot/agent_definition.yaml` to be suitable for container environment (`/app/data/...`).
+- **Provider Improvements:**
+    - Updated `karo/karo/providers/` (OpenAI, Anthropic) to remove unused tool parameters.
+    - Fixed prompt formatting issues in the Anthropic provider to properly handle system prompts and user messages.
+    - Improved error handling for API responses across all providers.
+- **Example Refactoring:**
+    - Refactored `karo/examples/base-examples/4_agent_with_tools.py` to use external tool orchestration.
+    - Refactored `karo/examples/order-chatbot/main.py` to use internal `ConversationHistory`.
+    - Updated Excel summarizer to use proper external history passing to fix hallucination issues.
+- **Documentation Updates:**
+    - Updated documentation files within `karo/docs/` (deployment, logging, agents, tools, quickstart, core concepts) to reflect refactored tool handling, new features (history, logging, deployment server), and Dockerization.
+    - Added new documentation for database integration and provider-specific configuration.
+    - Updated example tutorials with best practices for prompt engineering and external history handling.
+- **Import Path Standardization:**
+    - Changed imports in core modules (`base_agent.py`, `memory_manager.py`, `serving/config.py`) and examples (`csv_order_reader_tool.py`, `order-chatbot/main.py`) to use consistent absolute paths (`karo.karo...`) to resolve Pydantic validation issues.
+    - Updated default paths in `karo/examples/order-chatbot/agent_definition.yaml` to be suitable for container environment (`/app/data/...`).
 
 ### Fixed
 - Corrected `AttributeError` in `karo/examples/base-examples/5_system_prompt_builder_example.py`.
@@ -56,3 +74,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed unused `bot_response_for_history` variable in `karo/examples/order-chatbot/main.py` after implementing internal history management.
 - Fixed Pydantic validation error in `InMemorySessionService.create_session` when handling `session_id=None`.
 - Fixed extraction of assistant response content for session event logging in `karo/karo/serving/server.py`.
+- Fixed hallucination issues in Excel summarizer example by properly structuring prompts and implementing external history passing.
+- Resolved message formatting issues in the Anthropic provider that were causing the "No valid messages found in prompt" warning.
+- Fixed logging inconsistencies in the database connection module.

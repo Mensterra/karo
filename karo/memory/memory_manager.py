@@ -2,10 +2,11 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid # Import uuid module
-from karo.memory.memory_models import MemoryQueryResult, MemoryRecord
-from karo.memory.services.chromadb_service import ChromaDBConfig, ChromaDBService
 from pydantic import BaseModel, Field # Import BaseModel and Field
 
+# Use absolute path for consistency during refactor
+from karo.memory.services.chromadb_service import ChromaDBService, ChromaDBConfig
+from karo.memory.memory_models import MemoryRecord, MemoryQueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,7 @@ if __name__ == "__main__":
     load_dotenv(dotenv_path=dotenv_path)
 
     # Basic configuration for ChromaDBService
+    # from karo.memory.services.chromadb_service import ChromaDBConfig # Already imported
     chroma_config = ChromaDBConfig() # Uses defaults
 
     try:

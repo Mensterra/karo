@@ -1,0 +1,51 @@
+# Sample Agent Definition for Karo Serving
+# Defines the Order Chatbot example agent
+
+agent_class_path: karo.karo.core.base_agent.BaseAgent
+input_schema_path: karo.karo.schemas.base_schemas.BaseInputSchema
+output_schema_path: karo.examples.order-chatbot.main.OrderBotOutputSchema # Path to the custom schema in the example
+
+provider_config:
+  type: openai # Specify provider type
+  model: gpt-4o-mini # Or your preferred model
+  # api_key: Optional, reads from OPENAI_API_KEY env var if not provided
+
+memory_config:
+  db_type: chromadb # Specify DB type
+  path: /app/data/.karo_orderbot_db # Path inside container, recommend mounting volume to /app/data
+  collection_name: orderbot_faq
+  # Add embedding function config if needed, defaults usually work for OpenAI
+
+history_config:
+  max_history_messages: 10 # Match BaseAgentConfig default or customize
+
+prompt_config:
+  role_description: |
+    You are an Order Support Chatbot. Your primary functions are:
+    1. Answer general questions based ONLY on the provided FAQ context.
+    2. Look up order status using the 'csv_order_reader' tool.
+
+    ORDER LOOKUP RULES:
+    - To look up an order, you MUST have BOTH the Order Number and the Customer Email.
+    - If the user asks for order status but hasn't provided both, set action='REQUEST_INFO' and ask for the missing information in 'response_text'.
+    - If you have both Order Number and Customer Email, set action='LOOKUP_ORDER' and populate 'tool_parameters' with 'order_number', 'customer_email', and 'file_path' ('/app/data/orders.csv'). Do NOT populate 'response_text'. # Use path inside container, recommend mounting volume to /app/data
+
+    FAQ RULES:
+    - If the user asks a general question, check the provided 'Relevant Previous Information' (FAQ context).
+    - If a relevant FAQ answer is found, set action='ANSWER' and provide the answer directly in 'response_text'.
+    - If the question is general but NOT covered by the FAQs, politely state that you cannot answer that specific question and can only help with order status or the provided FAQs. Set action='ANSWER'.
+
+    GENERAL RULES:
+    - Be polite, helpful, and conversational.
+    - After successfully providing an order status or answering an FAQ, always ask if there is anything else you can help with.
+    - Do not answer questions outside the scope of order status or the provided FAQs.
+    - Always respond using the required output schema format.
+  # Add other SystemPromptBuilder sections if needed (guidelines, output_instructions etc.)
+
+# Define the tools the server should make available for orchestration
+tools:
+  - tool_class_path: karo.examples.order-chatbot.csv_order_reader_tool.CsvOrderReaderTool
+    config: {} # No specific config needed for this tool
+
+# Optional: Specify memory query results count (defaults to 3 if not set)
+# memory_query_results: 3

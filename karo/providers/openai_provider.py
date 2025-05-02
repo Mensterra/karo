@@ -1,10 +1,11 @@
 import instructor
+import openai
 from openai import OpenAI, APIError, RateLimitError # Import specific errors if needed for handling
 from pydantic import BaseModel, Field, SecretStr, HttpUrl, ValidationError
-from typing import Any, Type, List, Dict, Optional
+from typing import Any, Type, List, Dict, Optional, Union
 
 from karo.providers.base_provider import BaseProvider
-from karo.schemas.base_schemas import BaseOutputSchema
+from karo.schemas.base_schemas import BaseOutputSchema, AgentErrorSchema # For potential error wrapping
 
 from typing import Literal # Import Literal
 

@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "karo-excel-summarizer-example"
+version = "0.4.0"
+description = "Example using Karo framework to summarize Excel files."
+authors = ["Mensterra <support@mensterra.com>"] # Adjust as needed
+readme = "README.md"
+packages = [{ include = "karo", from = "../.."}] # Include karo from parent
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+# Depend on the local Karo framework package using path
+karo = {path = "../..", develop = true}
+# Example-specific dependencies
+pandas = ">=2.0.0"
+openpyxl = ">=3.1.0"
+python-dotenv = ">=1.0.0"
+rich = ">=13.0.0"
+# Add other direct dependencies of the example if needed (instructor/openai are pulled via karo)
+# instructor = ">=1.0.0"
+# openai = ">=1.0.0"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
