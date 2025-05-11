@@ -136,3 +136,4 @@ cython_debug/
 examples/order-chatbot/.karo_orderbot_db/
 karo/.karo_chroma_db/*
 embedding_model_refactor_plan.md
+examples/order_chatbot/.karo_orderbot_db/
