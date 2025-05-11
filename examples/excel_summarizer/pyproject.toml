@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karo-excel-summarizer-example"
-version = "0.4.0"
+version = "0.4.1"
 description = "Example using Karo framework to summarize Excel files."
 authors = ["Mensterra <support@mensterra.com>"] # Adjust as needed
 readme = "README.md"

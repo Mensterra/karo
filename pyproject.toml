@@ -1,6 +1,6 @@
 [project]
 name = "karo"
-version = "0.4.0"
+version = "0.4.1"
 description = "Modular Python framework for building AI agents with persistent memory"
 authors = [
     {name = "Mensterra",email = "support@mensterra.com"}

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karo-exa-search-tool"
-version = "0.4.0"
+version = "0.4.1"
 description = "A Karo Agent Framework tool for searching the web and retrieving content using the Exa API."
 authors = ["Mensterra <support@mensterra.com>"]
 readme = "README.md"

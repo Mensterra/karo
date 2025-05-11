@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karo-order-chatbot-example"
-version = "0.4.0"
+version = "0.4.1"
 description = "Example chatbot using Karo framework for order status lookup and FAQ."
 authors = ["Mensterra <support@mensterra.com>"] # Adjust as needed
 readme = "README.md"
